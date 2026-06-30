@@ -13,18 +13,14 @@ import java.nio.ByteBuffer;
 public class TrajectorySegmentWithMetadataMaterializer extends RecordMaterializer<TrajectorySegmentWithMetadata> {
 
     private String objectId;
-    private long segment;
 
     private byte[] longitude;
     private byte[] latitude;
-    private byte[] timestamp;
 
     private double minLongitude;
     private double minLatitude;
-    private long minTimestamp;
     private double maxLongitude;
     private double maxLatitude;
-    private long maxTimestamp;
 
     private byte[] pivotsLongitude;
     private byte[] pivotsLatitude;
@@ -39,32 +35,24 @@ public class TrajectorySegmentWithMetadataMaterializer extends RecordMaterialize
             if(i==0){
                 return p0;
             } else if(i==1){
-                return p1;
-            } else if(i==2){
                 return p2;
-            } else if(i==3){
+            } else if(i==2){
                 return p3;
-            }else if(i ==4){
-                return p4;
-            } else if(i==5){
+            } else if(i==3){
                 return p5;
-            } else if(i==6){
+            } else if(i==4){
                 return p6;
-            } else if(i==7){
-                return p7;
-            } else if(i==8){
+            }  else if(i==5){
                 return p8;
-            } else if(i==9){
+            } else if(i==6){
                 return p9;
-            } else if(i==10){
-                return p10;
-            } else if(i==11){
+            } else if(i==7){
                 return p11;
-            } else if(i==12){
+            } else if(i==8){
                 return p12;
-            } else if(i==13){
+            } else if(i==9){
                 return p13;
-            } else if(i==14){
+            } else if(i==10){
                 return p14;
             }
             return null;
@@ -94,19 +82,6 @@ public class TrajectorySegmentWithMetadataMaterializer extends RecordMaterialize
         }
     };
 
-    PrimitiveConverter p1 = new PrimitiveConverter() {
-        @Override
-        public boolean isPrimitive() {
-            return super.isPrimitive();
-        }
-
-        @Override
-        public void addLong(long value) {
-            segment = value;
-        }
-    };
-
-
     PrimitiveConverter p2 = new PrimitiveConverter() {
         @Override
         public boolean isPrimitive() {
@@ -128,18 +103,6 @@ public class TrajectorySegmentWithMetadataMaterializer extends RecordMaterialize
         @Override
         public void addBinary(Binary val) {
             latitude = val.getBytes();
-        }
-    };
-
-    PrimitiveConverter p4 = new PrimitiveConverter() {
-        @Override
-        public boolean isPrimitive() {
-            return super.isPrimitive();
-        }
-
-        @Override
-        public void addBinary(Binary val) {
-            timestamp = val.getBytes();
         }
     };
 
@@ -167,18 +130,6 @@ public class TrajectorySegmentWithMetadataMaterializer extends RecordMaterialize
         }
     };
 
-    PrimitiveConverter p7 = new PrimitiveConverter() {
-        @Override
-        public boolean isPrimitive() {
-            return super.isPrimitive();
-        }
-
-        @Override
-        public void addLong(long value) {
-            minTimestamp = value;
-        }
-    };
-
     PrimitiveConverter p8 = new PrimitiveConverter() {
         @Override
         public boolean isPrimitive() {
@@ -200,18 +151,6 @@ public class TrajectorySegmentWithMetadataMaterializer extends RecordMaterialize
         @Override
         public void addDouble(double value) {
             maxLatitude = value;
-        }
-    };
-
-    PrimitiveConverter p10 = new PrimitiveConverter() {
-        @Override
-        public boolean isPrimitive() {
-            return super.isPrimitive();
-        }
-
-        @Override
-        public void addLong(long value) {
-            maxTimestamp = value;
         }
     };
 
@@ -269,23 +208,22 @@ public class TrajectorySegmentWithMetadataMaterializer extends RecordMaterialize
 
         ByteBuffer bLongitude = ByteBuffer.wrap(longitude);
         ByteBuffer bLatitude = ByteBuffer.wrap(latitude);
-        ByteBuffer bTimestamp = ByteBuffer.wrap(timestamp);
 
-        SpatioTemporalPoint[] spatioTemporalPoints = new SpatioTemporalPoint[bLongitude.array().length/8];
-        for (int i = 0; i < spatioTemporalPoints.length; i++) {
-            spatioTemporalPoints[i] = new SpatioTemporalPoint(bLongitude.getDouble(),bLatitude.getDouble(),bTimestamp.getLong());
+        SpatialPoint[] spatialPoints = new SpatialPoint[bLongitude.array().length/8];
+        for (int i = 0; i < spatialPoints.length; i++) {
+            spatialPoints[i] = new SpatialPoint(bLongitude.getDouble(),bLatitude.getDouble());
         }
 
         if(pivotsLongitude == null){
-            return TrajectorySegmentWithMetadata.newTrajectorySegmentWithMetadata(new TrajectorySegment(objectId, 0, spatioTemporalPoints, minLongitude, minLatitude, minTimestamp,maxLongitude, maxLatitude, maxTimestamp),null,null);
+            return TrajectorySegmentWithMetadata.newTrajectorySegmentWithMetadata(new TrajectorySegment(objectId, spatialPoints, minLongitude, minLatitude,maxLongitude, maxLatitude),null,null);
         }
 
         ByteBuffer pLongitude = ByteBuffer.wrap(pivotsLongitude);
         ByteBuffer pLatitude = ByteBuffer.wrap(pivotsLatitude);
 
-        SpatialPoint[] spatialPoints = new SpatialPoint[pLongitude.array().length/8];
-        for (int i = 0; i < spatialPoints.length; i++) {
-            spatialPoints[i] = new SpatialPoint(pLongitude.getDouble(),pLatitude.getDouble());
+        SpatialPoint[] spatialPointsPivots = new SpatialPoint[pLongitude.array().length/8];
+        for (int i = 0; i < spatialPointsPivots.length; i++) {
+            spatialPointsPivots[i] = new SpatialPoint(pLongitude.getDouble(),pLatitude.getDouble());
         }
 
         pivotsLongitude = null;
@@ -296,7 +234,7 @@ public class TrajectorySegmentWithMetadataMaterializer extends RecordMaterialize
             intervals = new long[]{intervalStart, intervalStop};
         }
 
-        return TrajectorySegmentWithMetadata.newTrajectorySegmentWithMetadata(new TrajectorySegment(objectId, 0, spatioTemporalPoints, minLongitude, minLatitude, minTimestamp,maxLongitude, maxLatitude, maxTimestamp), spatialPoints, intervals);
+        return TrajectorySegmentWithMetadata.newTrajectorySegmentWithMetadata(new TrajectorySegment(objectId, spatialPoints, minLongitude, minLatitude,maxLongitude, maxLatitude), spatialPointsPivots, intervals);
     }
 
     @Override

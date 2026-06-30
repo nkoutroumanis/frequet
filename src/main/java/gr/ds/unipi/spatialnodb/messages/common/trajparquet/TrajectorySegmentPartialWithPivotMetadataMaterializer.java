@@ -12,14 +12,11 @@ import java.nio.ByteBuffer;
 public class TrajectorySegmentPartialWithPivotMetadataMaterializer extends RecordMaterializer<TrajectorySegmentWithPivotMetadata> {
 
     private String objectId;
-    private long segment;
 
     private double minLongitude;
     private double minLatitude;
-    private long minTimestamp;
     private double maxLongitude;
     private double maxLatitude;
-    private long maxTimestamp;
 
     private byte[] pivotsLongitude;
     private byte[] pivotsLatitude;
@@ -54,22 +51,16 @@ public class TrajectorySegmentPartialWithPivotMetadataMaterializer extends Recor
             if(i==0){
                 return p0;
             } else if(i==1){
-                return p1;
-            } else if(i==2){
                 return p5;
-            } else if(i==3){
+            } else if(i==2){
                 return p6;
-            }else if(i ==4){
-                return p7;
-            } else if(i==5){
+            } else if(i==3){
                 return p8;
-            } else if(i==6){
+            } else if(i==4){
                 return p9;
-            } else if(i==7){
-                return p10;
-            } else if(i==8){
+            }else if(i==5){
                 return p11;
-            } else if(i==9){
+            } else if(i==6){
                 return p12;
             }
             return null;
@@ -94,18 +85,6 @@ public class TrajectorySegmentPartialWithPivotMetadataMaterializer extends Recor
         @Override
         public void addBinary(Binary value) {
             objectId = value.toStringUsingUTF8();
-        }
-    };
-
-    PrimitiveConverter p1 = new PrimitiveConverter() {
-        @Override
-        public boolean isPrimitive() {
-            return super.isPrimitive();
-        }
-
-        @Override
-        public void addLong(long value) {
-            segment = value;
         }
     };
 
@@ -169,18 +148,6 @@ public class TrajectorySegmentPartialWithPivotMetadataMaterializer extends Recor
         }
     };
 
-    PrimitiveConverter p7 = new PrimitiveConverter() {
-        @Override
-        public boolean isPrimitive() {
-            return super.isPrimitive();
-        }
-
-        @Override
-        public void addLong(long value) {
-            minTimestamp = value;
-        }
-    };
-
     PrimitiveConverter p8 = new PrimitiveConverter() {
         @Override
         public boolean isPrimitive() {
@@ -202,18 +169,6 @@ public class TrajectorySegmentPartialWithPivotMetadataMaterializer extends Recor
         @Override
         public void addDouble(double value) {
             maxLatitude = value;
-        }
-    };
-
-    PrimitiveConverter p10 = new PrimitiveConverter() {
-        @Override
-        public boolean isPrimitive() {
-            return super.isPrimitive();
-        }
-
-        @Override
-        public void addLong(long value) {
-            maxTimestamp = value;
         }
     };
 
@@ -245,7 +200,7 @@ public class TrajectorySegmentPartialWithPivotMetadataMaterializer extends Recor
     public TrajectorySegmentWithPivotMetadata getCurrentRecord() {
 
         if(pivotsLongitude == null){
-            return TrajectorySegmentWithPivotMetadata.newTrajectorySegmentWithPivotMetadata(new TrajectorySegment(objectId, segment, null, minLongitude, minLatitude, minTimestamp,maxLongitude, maxLatitude, maxTimestamp),null);
+            return TrajectorySegmentWithPivotMetadata.newTrajectorySegmentWithPivotMetadata(new TrajectorySegment(objectId, null, minLongitude, minLatitude,maxLongitude, maxLatitude),null);
         }
 
         ByteBuffer pLongitude = ByteBuffer.wrap(pivotsLongitude);
@@ -258,7 +213,7 @@ public class TrajectorySegmentPartialWithPivotMetadataMaterializer extends Recor
 
         pivotsLongitude = null;
         pivotsLatitude = null;
-        return TrajectorySegmentWithPivotMetadata.newTrajectorySegmentWithPivotMetadata(new TrajectorySegment(objectId, segment, null, minLongitude, minLatitude, minTimestamp,maxLongitude, maxLatitude, maxTimestamp),spatialPoints);
+        return TrajectorySegmentWithPivotMetadata.newTrajectorySegmentWithPivotMetadata(new TrajectorySegment(objectId, null, minLongitude, minLatitude,maxLongitude, maxLatitude),spatialPoints);
     }
 
     @Override

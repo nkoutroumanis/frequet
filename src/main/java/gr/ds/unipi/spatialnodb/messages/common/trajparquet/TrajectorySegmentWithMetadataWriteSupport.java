@@ -21,16 +21,12 @@ public class TrajectorySegmentWithMetadataWriteSupport extends WriteSupport<Traj
 
     MessageType schema = MessageTypeParser.parseMessageType( "message TrajectorySegment {\n" +
             "required BINARY objectId;\n" +
-            "required INT64 segment;\n" +
             "required BINARY longitude;\n" +
             "required BINARY latitude;\n" +
-            "required BINARY timestamps;\n" +
             "required DOUBLE minLongitude;\n" +
             "required DOUBLE minLatitude;\n" +
-            "required INT64 minTimestamp;\n" +
             "required DOUBLE maxLongitude;\n" +
             "required DOUBLE maxLatitude;\n" +
-            "required INT64 maxTimestamp;\n" +
             "optional BINARY pivotsLongitude;\n" +
             "optional BINARY pivotsLatitude;\n" +
             "optional INT64 intervalStart;\n" +
@@ -56,83 +52,63 @@ public class TrajectorySegmentWithMetadataWriteSupport extends WriteSupport<Traj
         recordConsumer.addBinary(Binary.fromString(trajectory.getTrajectorySegment().getObjectId()));
         recordConsumer.endField("objectId",0);
 
-        recordConsumer.startField("segment",1);
-        recordConsumer.addLong(trajectory.getTrajectorySegment().getSegment());
-        recordConsumer.endField("segment",1);
-
-        ByteBuffer blongitude = ByteBuffer.allocate(trajectory.getTrajectorySegment().getSpatioTemporalPoints().length*8);
-        for (SpatioTemporalPoint stPoint : trajectory.getTrajectorySegment().getSpatioTemporalPoints()) {
+        ByteBuffer blongitude = ByteBuffer.allocate(trajectory.getTrajectorySegment().getSpatialPoints().length*8);
+        for (SpatialPoint stPoint : trajectory.getTrajectorySegment().getSpatialPoints()) {
             blongitude.putDouble(stPoint.getLongitude());
         }
-        recordConsumer.startField("longitude",2);
+        recordConsumer.startField("longitude",1);
         recordConsumer.addBinary(Binary.fromConstantByteArray(blongitude.array()));
-        recordConsumer.endField("longitude",2);
+        recordConsumer.endField("longitude",1);
 
-        ByteBuffer blatitude = ByteBuffer.allocate(trajectory.getTrajectorySegment().getSpatioTemporalPoints().length*8);
-        for (SpatioTemporalPoint stPoint : trajectory.getTrajectorySegment().getSpatioTemporalPoints()) {
+        ByteBuffer blatitude = ByteBuffer.allocate(trajectory.getTrajectorySegment().getSpatialPoints().length*8);
+        for (SpatialPoint stPoint : trajectory.getTrajectorySegment().getSpatialPoints()) {
             blatitude.putDouble(stPoint.getLatitude());
         }
-        recordConsumer.startField("latitude",3);
+        recordConsumer.startField("latitude",2);
         recordConsumer.addBinary(Binary.fromConstantByteArray(blatitude.array()));
-        recordConsumer.endField("latitude",3);
+        recordConsumer.endField("latitude",2);
 
-        ByteBuffer btimestamp = ByteBuffer.allocate(trajectory.getTrajectorySegment().getSpatioTemporalPoints().length*8);
-        for (SpatioTemporalPoint stPoint : trajectory.getTrajectorySegment().getSpatioTemporalPoints()) {
-            btimestamp.putLong(stPoint.getTimestamp());
-        }
-        recordConsumer.startField("timestamps",4);
-        recordConsumer.addBinary(Binary.fromConstantByteArray(btimestamp.array()));
-        recordConsumer.endField("timestamps",4);
-
-        recordConsumer.startField("minLongitude",5);
+        recordConsumer.startField("minLongitude",3);
         recordConsumer.addDouble(trajectory.getTrajectorySegment().getMinLongitude());
-        recordConsumer.endField("minLongitude",5);
+        recordConsumer.endField("minLongitude",3);
 
-        recordConsumer.startField("minLatitude",6);
+        recordConsumer.startField("minLatitude",4);
         recordConsumer.addDouble(trajectory.getTrajectorySegment().getMinLatitude());
-        recordConsumer.endField("minLatitude",6);
+        recordConsumer.endField("minLatitude",4);
 
-        recordConsumer.startField("minTimestamp",7);
-        recordConsumer.addLong(trajectory.getTrajectorySegment().getMinTimestamp());
-        recordConsumer.endField("minTimestamp",7);
-
-        recordConsumer.startField("maxLongitude",8);
+        recordConsumer.startField("maxLongitude",5);
         recordConsumer.addDouble(trajectory.getTrajectorySegment().getMaxLongitude());
-        recordConsumer.endField("maxLongitude",8);
+        recordConsumer.endField("maxLongitude",5);
 
-        recordConsumer.startField("maxLatitude",9);
+        recordConsumer.startField("maxLatitude",6);
         recordConsumer.addDouble(trajectory.getTrajectorySegment().getMaxLatitude());
-        recordConsumer.endField("maxLatitude",9);
-
-        recordConsumer.startField("maxTimestamp",10);
-        recordConsumer.addLong(trajectory.getTrajectorySegment().getMaxTimestamp());
-        recordConsumer.endField("maxTimestamp",10);
+        recordConsumer.endField("maxLatitude",6);
 
         if(trajectory.getPivots()!=null) {
             ByteBuffer bPivotlongitude = ByteBuffer.allocate(trajectory.getPivots().length * 8);
             for (SpatialPoint stPoint : trajectory.getPivots()) {
                 bPivotlongitude.putDouble(stPoint.getLongitude());
             }
-            recordConsumer.startField("pivotsLongitude", 11);
+            recordConsumer.startField("pivotsLongitude", 7);
             recordConsumer.addBinary(Binary.fromConstantByteArray(bPivotlongitude.array()));
-            recordConsumer.endField("pivotsLongitude", 11);
+            recordConsumer.endField("pivotsLongitude", 7);
 
             ByteBuffer bPivotlatitude = ByteBuffer.allocate(trajectory.getPivots().length * 8);
             for (SpatialPoint stPoint : trajectory.getPivots()) {
                 bPivotlatitude.putDouble(stPoint.getLatitude());
             }
-            recordConsumer.startField("pivotsLatitude", 12);
+            recordConsumer.startField("pivotsLatitude", 8);
             recordConsumer.addBinary(Binary.fromConstantByteArray(bPivotlatitude.array()));
-            recordConsumer.endField("pivotsLatitude", 12);
+            recordConsumer.endField("pivotsLatitude", 8);
         }
         if(trajectory.getInterval()!=null){
-            recordConsumer.startField("intervalStart",13);
+            recordConsumer.startField("intervalStart",9);
             recordConsumer.addLong(trajectory.getInterval()[0]);
-            recordConsumer.endField("intervalStart",13);
+            recordConsumer.endField("intervalStart",9);
 
-            recordConsumer.startField("intervalEnd",14);
+            recordConsumer.startField("intervalEnd",10);
             recordConsumer.addLong(trajectory.getInterval()[1]);
-            recordConsumer.endField("intervalEnd",14);
+            recordConsumer.endField("intervalEnd",10);
         }
 
         recordConsumer.endMessage();

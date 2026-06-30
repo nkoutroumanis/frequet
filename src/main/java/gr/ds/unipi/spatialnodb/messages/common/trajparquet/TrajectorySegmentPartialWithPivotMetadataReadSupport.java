@@ -16,13 +16,10 @@ public class TrajectorySegmentPartialWithPivotMetadataReadSupport extends ReadSu
 
         MessageType schema = MessageTypeParser.parseMessageType( "message TrajectorySegment {\n" +
                 "required BINARY objectId;\n" +
-                "required INT64 segment;\n" +
                 "required DOUBLE minLongitude;\n" +
                 "required DOUBLE minLatitude;\n" +
-                "required INT64 minTimestamp;\n" +
                 "required DOUBLE maxLongitude;\n" +
                 "required DOUBLE maxLatitude;\n" +
-                "required INT64 maxTimestamp;\n" +
                 "optional BINARY pivotsLongitude;\n" +
                 "optional BINARY pivotsLatitude;\n" +
                 "}");

@@ -18,10 +18,8 @@ public class TrajectorySegmentPartialWithMetadataReadSupport extends ReadSupport
                 "required BINARY objectId;\n" +
                 "required DOUBLE minLongitude;\n" +
                 "required DOUBLE minLatitude;\n" +
-                "required INT64 minTimestamp;\n" +
                 "required DOUBLE maxLongitude;\n" +
                 "required DOUBLE maxLatitude;\n" +
-                "required INT64 maxTimestamp;\n" +
                 "optional BINARY pivotsLongitude;\n" +
                 "optional BINARY pivotsLatitude;\n" +
                 "optional INT64 intervalStart;\n" +

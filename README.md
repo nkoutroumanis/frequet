@@ -1,4 +1,4 @@
-# TrajParquet
+# Frequet
 A column-oriented file format for storing and querying trajectories
 
 ## Acknowledgements

@@ -208,7 +208,7 @@ public class TrajectorySegmentPartialWithIntervalMetadataMaterializer extends Re
 //        if(objectId.equals("538002828")&& segment==2){
 //            System.out.println("Here2 "+ Arrays.toString(intervals));
 //        }
-        return TrajectorySegmentWithIntervalMetadata.newTrajectorySegmentWithIntervalMetadata(new TrajectorySegment(objectId, -1, null, -1, -1, -1,-1, -1, -1), intervals);
+        return TrajectorySegmentWithIntervalMetadata.newTrajectorySegmentWithIntervalMetadata(new TrajectorySegment(objectId, null, -1, -1, -1, -1), intervals);
     }
 
     @Override

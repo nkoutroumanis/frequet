@@ -15,10 +15,8 @@ public class TrajectorySegmentPartialWithMetadataMaterializer extends RecordMate
 
     private double minLongitude;
     private double minLatitude;
-    private long minTimestamp;
     private double maxLongitude;
     private double maxLatitude;
-    private long maxTimestamp;
 
     private byte[] pivotsLongitude;
     private byte[] pivotsLatitude;
@@ -35,21 +33,17 @@ public class TrajectorySegmentPartialWithMetadataMaterializer extends RecordMate
                 return p5;
             } else if(i==2){
                 return p6;
-            }else if(i ==3){
-                return p7;
-            } else if(i==4){
+            } else if(i==3){
                 return p8;
-            } else if(i==5){
+            } else if(i==4){
                 return p9;
-            } else if(i==6){
-                return p10;
-            } else if(i==7){
+            } else if(i==5){
                 return p11;
-            } else if(i==8){
+            } else if(i==6){
                 return p12;
-            } else if(i==9){
+            } else if(i==7){
                 return p13;
-            } else if (i==10) {
+            } else if (i==8) {
                 return p14;
             }
             return null;
@@ -103,18 +97,6 @@ public class TrajectorySegmentPartialWithMetadataMaterializer extends RecordMate
         }
     };
 
-    PrimitiveConverter p7 = new PrimitiveConverter() {
-        @Override
-        public boolean isPrimitive() {
-            return super.isPrimitive();
-        }
-
-        @Override
-        public void addLong(long value) {
-            minTimestamp = value;
-        }
-    };
-
     PrimitiveConverter p8 = new PrimitiveConverter() {
         @Override
         public boolean isPrimitive() {
@@ -136,18 +118,6 @@ public class TrajectorySegmentPartialWithMetadataMaterializer extends RecordMate
         @Override
         public void addDouble(double value) {
             maxLatitude = value;
-        }
-    };
-
-    PrimitiveConverter p10 = new PrimitiveConverter() {
-        @Override
-        public boolean isPrimitive() {
-            return super.isPrimitive();
-        }
-
-        @Override
-        public void addLong(long value) {
-            maxTimestamp = value;
         }
     };
 
@@ -203,7 +173,7 @@ public class TrajectorySegmentPartialWithMetadataMaterializer extends RecordMate
     public TrajectorySegmentWithMetadata getCurrentRecord() {
 
         if(pivotsLongitude == null){
-            return TrajectorySegmentWithMetadata.newTrajectorySegmentWithMetadata(new TrajectorySegment(objectId, 0, null, minLongitude, minLatitude, minTimestamp,maxLongitude, maxLatitude, maxTimestamp),null,null);
+            return TrajectorySegmentWithMetadata.newTrajectorySegmentWithMetadata(new TrajectorySegment(objectId, null, minLongitude, minLatitude,maxLongitude, maxLatitude),null,null);
         }
 
         ByteBuffer pLongitude = ByteBuffer.wrap(pivotsLongitude);
@@ -222,7 +192,7 @@ public class TrajectorySegmentPartialWithMetadataMaterializer extends RecordMate
             intervals = new long[]{intervalStart, intervalStop};
         }
 
-        return TrajectorySegmentWithMetadata.newTrajectorySegmentWithMetadata(new TrajectorySegment(objectId, 0, null, minLongitude, minLatitude, minTimestamp,maxLongitude, maxLatitude, maxTimestamp), spatialPoints, intervals);
+        return TrajectorySegmentWithMetadata.newTrajectorySegmentWithMetadata(new TrajectorySegment(objectId, null, minLongitude, minLatitude,maxLongitude, maxLatitude), spatialPoints, intervals);
     }
 
     @Override
