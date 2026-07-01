@@ -50,9 +50,6 @@ public class DataLoading {
         final String metricsPathExport = dataLoading.getString("metricsPathExport");
         final String indexType = dataLoading.getString("indexType");
         final IndexUtils indexUtils;
-        if(!(indexType.equals("2D") || indexType.equals("3D"))) {
-            throw new IllegalArgumentException("The index parameter must be either 2D or 3D");
-        }
 
         Config hilbert = dataLoading.getConfig("hilbert");
 
@@ -271,16 +268,12 @@ public class DataLoading {
 
         final double minLon = bounds.getMinLongitude();
         final double minLat = bounds.getMinLatitude();
-        final long minTime = bounds.getMinTimestamp();
         final double maxLon = bounds.getMaxLongitude()+0.0000001;
         final double maxLat = bounds.getMaxLatitude()+0.0000001;
-        final long maxTime = bounds.getMaxTimestamp()+1000;
 
-        if(indexType.equals("3D")) {
-            indexUtils = new IndexUtils3D(minLon, minLat, minTime, maxLon, maxLat, maxTime, maxOrdinates);
-        }else {
-            indexUtils = new IndexUtils2D(minLon, minLat, maxLon, maxLat, maxOrdinates);
-        }
+
+        indexUtils = new IndexUtils(minLon, minLat, maxLon, maxLat, maxOrdinates);
+
 
         JavaPairRDD rdd = rdd1.flatMapToPair(f-> {
                     List<Tuple3<Double, Double, Long>> tuple = f._2;
@@ -297,13 +290,13 @@ public class DataLoading {
 
                     //initialize for the currentHilValue
                     int part = 1;
-                    long[] hil1 = indexUtils.scale(tuple.get(0)._1(), tuple.get(0)._2(), tuple.get(0)._3());//HilbertUtil.scaleGeoTemporalPoint(tuple.get(0)._1(), minLon, maxLon, tuple.get(0)._2(), minLat, maxLat, tuple.get(0)._3(), minTime, maxTime, maxOrdinates);
+                    long[] hil1 = indexUtils.scale(tuple.get(0)._1(), tuple.get(0)._2());//HilbertUtil.scaleGeoTemporalPoint(tuple.get(0)._1(), minLon, maxLon, tuple.get(0)._2(), minLat, maxLat, tuple.get(0)._3(), minTime, maxTime, maxOrdinates);
                     Ranges ranges = ((SmallHilbertCurve)smallHilbertCurveBr.getValue()).query(hil1, hil1, 0);
                     long currentHilValue = ranges.toList().get(0).low();
                     currentPart.add(new SpatioTemporalPoint(tuple.get(0)._1(), tuple.get(0)._2(),tuple.get(0)._3()));
 
                     for (int i = 1; i < tuple.size(); i++) {
-                        long[] hil2 = indexUtils.scale(tuple.get(i)._1(), tuple.get(i)._2(), tuple.get(i)._3());//HilbertUtil.scaleGeoTemporalPoint(tuple.get(i)._1(), minLon, maxLon, tuple.get(i)._2(), minLat, maxLat, tuple.get(i)._3(), minTime, maxTime, maxOrdinates);
+                        long[] hil2 = indexUtils.scale(tuple.get(i)._1(), tuple.get(i)._2());//HilbertUtil.scaleGeoTemporalPoint(tuple.get(i)._1(), minLon, maxLon, tuple.get(i)._2(), minLat, maxLat, tuple.get(i)._3(), minTime, maxTime, maxOrdinates);
                         ranges = ((SmallHilbertCurve)smallHilbertCurveBr.getValue()).query(hil2, hil2, 0);
                         long hilbertValue = ranges.toList().get(0).low();
 
@@ -410,7 +403,7 @@ public class DataLoading {
                                 }
                             }
 
-                            trajectoryParts.add(Tuple2.apply(currentHilValue, new TrajectorySegment(objectId, part++, currentPart.toArray(new SpatioTemporalPoint[0]), minLongitude, minLatitude, minTimestamp, maxLongitude, maxLatitude, maxTimestamp)));
+                            trajectoryParts.add(Tuple2.apply(currentHilValue, new TrajectorySegment(objectId, currentPart.toArray(new SpatialPoint[0]), minLongitude, minLatitude, maxLongitude, maxLatitude)));
                             currentPart.clear();
 
                             Comparator<Tuple2<Long, SpatioTemporalPoint[]>> comparator = Comparator.comparingLong(d-> d._2[0].getTimestamp());
@@ -498,7 +491,7 @@ public class DataLoading {
                         if(currentPart.size()==1){
                             throw new Exception("There is a trajectory segment containing one point");
                         }
-                        trajectoryParts.add(Tuple2.apply(currentHilValue,new TrajectorySegment(objectId, part++, currentPart.toArray(new SpatioTemporalPoint[0]), minLongitude, minLatitude, minTimestamp, maxLongitude, maxLatitude, maxTimestamp)));
+                        trajectoryParts.add(Tuple2.apply(currentHilValue,new TrajectorySegment(objectId, currentPart.toArray(new SpatioTemporalPoint[0]), minLongitude, minLatitude, maxLongitude, maxLatitude)));
 
                         currentPart.clear();
                     }

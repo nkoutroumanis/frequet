@@ -4,8 +4,7 @@ import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
 import gr.ds.unipi.spatialnodb.dataloading.HilbertUtil;
 import gr.ds.unipi.spatialnodb.messages.common.IndexUtils;
-import gr.ds.unipi.spatialnodb.messages.common.IndexUtils2D;
-import gr.ds.unipi.spatialnodb.messages.common.IndexUtils3D;
+import gr.ds.unipi.spatialnodb.messages.common.SpatialPoint;
 import gr.ds.unipi.spatialnodb.messages.common.SpatioTemporalPoint;
 import gr.ds.unipi.spatialnodb.messages.common.trajparquet.*;
 import gr.ds.unipi.spatialnodb.messages.common.trajparquet.pathReadParquet.ParquetInputFormatWithKey;
@@ -71,20 +70,12 @@ public class BatchQueriesDirectoriesFrechet2DIntervals {
         final double maxLon = boundaries.getDouble("maxLon");
         final double maxLat = boundaries.getDouble("maxLat");
         final long maxTime = boundaries.getLong("maxTime");
-        final String indexType = metadata.getString("indexType");
 
-        final SmallHilbertCurve hilbertCurve = HilbertCurve.small().bits(bits).dimensions(indexType.equals("3D")?3:2);
+        final SmallHilbertCurve hilbertCurve = HilbertCurve.small().bits(bits).dimensions(2);
         final long maxOrdinates = hilbertCurve.maxOrdinate();
 
-        final IndexUtils indexUtils;
-        if(!(indexType.equals("2D") || indexType.equals("3D"))) {
-            throw new IllegalArgumentException("The index parameter must be either 2D or 3D");
-        }
-        if(indexType.equals("3D")) {
-            indexUtils = new IndexUtils3D(minLon, minLat, minTime, maxLon, maxLat, maxTime, maxOrdinates);
-        }else {
-            indexUtils = new IndexUtils2D(minLon, minLat, maxLon, maxLat, maxOrdinates);
-        }
+        final IndexUtils indexUtils = new IndexUtils(minLon, minLat, maxLon, maxLat, maxOrdinates);;
+
 
         Job jobWholeTrajectory = Job.getInstance();
         Job jobTrajectorySegments = Job.getInstance();
@@ -127,7 +118,7 @@ public class BatchQueriesDirectoriesFrechet2DIntervals {
             public TrajectorySegment call(String query) {
 
                 int pointsCount = countPoints(query);
-                SpatioTemporalPoint[] trajectoryQuery = new SpatioTemporalPoint[pointsCount];
+                SpatialPoint[] trajectoryQuery = new SpatialPoint[pointsCount];
                 char[] chars = query.toCharArray();
                 int ichar = 0;
                 int idx = 0;
@@ -160,7 +151,7 @@ public class BatchQueriesDirectoriesFrechet2DIntervals {
                     long tstp = parseLong(chars, start, ichar);
                     ichar++; // skip ';'
 
-                    trajectoryQuery[idx++] = new SpatioTemporalPoint(lon,lat,tstp);
+                    trajectoryQuery[idx++] = new SpatialPoint(lon,lat);
 
                     if(Double.compare(lon,mbrMaxLongitude)==1){
                         mbrMaxLongitude = lon;
@@ -182,7 +173,7 @@ public class BatchQueriesDirectoriesFrechet2DIntervals {
                         mbrMinTimestamp = tstp;
                     }
                 }
-                return new TrajectorySegment("", -1, trajectoryQuery, mbrMinLongitude, mbrMinLatitude, mbrMinTimestamp, mbrMaxLongitude, mbrMaxLatitude, mbrMaxTimestamp);            }
+                return new TrajectorySegment("", trajectoryQuery, mbrMinLongitude, mbrMinLatitude, mbrMaxLongitude, mbrMaxLatitude);            }
         };
 
 
@@ -196,13 +187,12 @@ public class BatchQueriesDirectoriesFrechet2DIntervals {
             final double queryMaxLongitude = Double.min(maxLon-0.0000001,tuple2._2.getMaxLongitude()+epsilon);
             final double queryMaxLatitude = Double.min(maxLat-0.0000001,tuple2._2.getMaxLatitude()+epsilon);
 
-            long[] hilStart = indexUtils.scale(queryMinLongitude, queryMinLatitude, minTime);//HilbertUtil.scaleGeoTemporalPoint(queryMinLongitude, minLon, maxLon,queryMinLatitude, minLat, maxLat, queryMinTimestamp, minTime, maxTime, maxOrdinates);
-            long[] hilEnd = indexUtils.scale(queryMaxLongitude, queryMaxLatitude, maxTime-1000);//HilbertUtil.scaleGeoTemporalPoint(queryMaxLongitude, minLon, maxLon, queryMaxLatitude, minLat, maxLat, queryMaxTimestamp, minTime, maxTime, maxOrdinates);
+            long[] hilStart = indexUtils.scale(queryMinLongitude, queryMinLatitude);//HilbertUtil.scaleGeoTemporalPoint(queryMinLongitude, minLon, maxLon,queryMinLatitude, minLat, maxLat, queryMinTimestamp, minTime, maxTime, maxOrdinates);
+            long[] hilEnd = indexUtils.scale(queryMaxLongitude, queryMaxLatitude);//HilbertUtil.scaleGeoTemporalPoint(queryMaxLongitude, minLon, maxLon, queryMaxLatitude, minLat, maxLat, queryMaxTimestamp, minTime, maxTime, maxOrdinates);
             Ranges ranges = hilbertCurveBr.query(hilStart, hilEnd, 0);
 
             List<Tuple2<Long,Long>> trajectoryIdToCubes = new ArrayList<>();
 
-            if(indexUtils instanceof IndexUtils2D){
                 for (Range range : ranges.toList()) {
                     for (long r = range.low(); r <= range.high(); r++) {
                         if(directoriesSet.contains(String.valueOf(r))) {
@@ -213,32 +203,12 @@ public class BatchQueriesDirectoriesFrechet2DIntervals {
                             double xMax = minLon + ((cube[0]+1) * (maxLon-minLon)/(maxOrdinates+ 1L));
                             double yMax = minLat + ((cube[1]+1) * (maxLat-minLat)/(maxOrdinates+ 1L));
 
-                            if(areTrajectoryPointsDistanceLessThanEpsilonToCube(tuple2._2.getSpatioTemporalPoints(), xMin, yMin, xMax, yMax,epsilon)){
+                            if(areTrajectoryPointsDistanceLessThanEpsilonToCube(tuple2._2.getSpatialPoints(), xMin, yMin, xMax, yMax,epsilon)){
                                 trajectoryIdToCubes.add(Tuple2.apply(r,tuple2._1));
                             }
                         }
                     }
                 }
-            }else{
-                for (long i = hilStart[0]; i <= hilEnd[0]; i++) {
-                    for (long j = hilStart[1]; j <= hilEnd[1]; j++) {
-                            double xMin = minLon + (i * (maxLon - minLon) / (maxOrdinates + 1L));
-                            double yMin = minLat + (j * (maxLat - minLat) / (maxOrdinates + 1L));
-
-                            double xMax = minLon + ((i + 1) * (maxLon - minLon) / (maxOrdinates + 1L));
-                            double yMax = minLat + ((j + 1) * (maxLat - minLat) / (maxOrdinates + 1L));
-
-                            if(areTrajectoryPointsDistanceLessThanEpsilonToCube(tuple2._2.getSpatioTemporalPoints(), xMin, yMin, xMax, yMax,epsilon)) {
-                                for (long k = hilStart[2]; k <= hilEnd[2]; k++) {
-                                    long cubeId = hilbertCurveBr.index(i,j,k);
-                                    if(directoriesSet.contains(String.valueOf(cubeId))) {
-                                        trajectoryIdToCubes.add(Tuple2.apply(cubeId,tuple2._1));
-                                    }
-                                }
-                            }
-                    }
-                }
-            }
 
 //            final HashSet<Long> initialCubes = new HashSet<>();
 //
@@ -323,14 +293,14 @@ public class BatchQueriesDirectoriesFrechet2DIntervals {
         JavaPairRDD<Void, TrajectorySegment> trajectories = (JavaPairRDD<Void, TrajectorySegment>) jsc.newAPIHadoopFile(parquetPath+File.separator+"idIndex", ParquetInputFormat.class, Void.class, TrajectorySegment.class, jobWholeTrajectory.getConfiguration());
         JavaPairRDD<Long, Tuple2<TrajectorySegment,TrajectorySegment>> results = trajectories.mapToPair(i-> Tuple2.apply(i._2.getObjectId(), i._2)).join(objectIdQueryIdPairs, partitions).mapToPair(i-> Tuple2.apply(i._2._2, i._2._1)).join(trajectoryQueries, partitions)
 
-                .filter(f->{ if(Double.compare(HilbertUtil.euclideanDistance(f._2._1.getSpatioTemporalPoints()[0].getLongitude(),f._2._1.getSpatioTemporalPoints()[0].getLatitude(),   f._2._2.getSpatioTemporalPoints()[0].getLongitude(),f._2._2.getSpatioTemporalPoints()[0].getLatitude()),epsilon)!=1
-                        && Double.compare(HilbertUtil.euclideanDistance(f._2._1.getSpatioTemporalPoints()[f._2._1.getSpatioTemporalPoints().length-1].getLongitude(),f._2._1.getSpatioTemporalPoints()[f._2._1.getSpatioTemporalPoints().length-1].getLatitude(), f._2._2.getSpatioTemporalPoints()[f._2._2.getSpatioTemporalPoints().length-1].getLongitude(),f._2._2.getSpatioTemporalPoints()[f._2._2.getSpatioTemporalPoints().length-1].getLatitude()                      ),epsilon)!=1) {
+                .filter(f->{ if(Double.compare(HilbertUtil.euclideanDistance(f._2._1.getSpatialPoints()[0].getLongitude(),f._2._1.getSpatialPoints()[0].getLatitude(),   f._2._2.getSpatialPoints()[0].getLongitude(),f._2._2.getSpatialPoints()[0].getLatitude()),epsilon)!=1
+                        && Double.compare(HilbertUtil.euclideanDistance(f._2._1.getSpatialPoints()[f._2._1.getSpatialPoints().length-1].getLongitude(),f._2._1.getSpatialPoints()[f._2._1.getSpatialPoints().length-1].getLatitude(), f._2._2.getSpatialPoints()[f._2._2.getSpatialPoints().length-1].getLongitude(),f._2._2.getSpatialPoints()[f._2._2.getSpatialPoints().length-1].getLatitude()                      ),epsilon)!=1) {
                     return true;
                 }else{
                     return false;
                 }})
                 .filter(f->{
-                    if(Double.compare(HilbertUtil.frechetDistance(f._2._1.getSpatioTemporalPoints(), f._2._2.getSpatioTemporalPoints()),epsilon)!=1){
+                    if(Double.compare(HilbertUtil.frechetDistance(f._2._1.getSpatialPoints(), f._2._2.getSpatialPoints()),epsilon)!=1){
                         return true;
                     }else{
                         return false;

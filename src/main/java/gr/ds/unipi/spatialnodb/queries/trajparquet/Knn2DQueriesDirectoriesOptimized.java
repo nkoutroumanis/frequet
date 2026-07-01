@@ -59,20 +59,11 @@ public class Knn2DQueriesDirectoriesOptimized {
         final double maxLon = boundaries.getDouble("maxLon");
         final double maxLat = boundaries.getDouble("maxLat");
         final long maxTime = boundaries.getLong("maxTime");
-        final String indexType = metadata.getString("indexType");
 
-        final SmallHilbertCurve hilbertCurve = HilbertCurve.small().bits(bits).dimensions(indexType.equals("3D")?3:2);
+        final SmallHilbertCurve hilbertCurve = HilbertCurve.small().bits(bits).dimensions(2);
         final long maxOrdinates = hilbertCurve.maxOrdinate();
 
-        final IndexUtils indexUtils;
-        if(!(indexType.equals("2D") || indexType.equals("3D"))) {
-            throw new IllegalArgumentException("The index parameter must be either 2D or 3D");
-        }
-        if(indexType.equals("3D")) {
-            indexUtils = new IndexUtils3D(minLon, minLat, minTime, maxLon, maxLat, maxTime, maxOrdinates);
-        }else {
-            indexUtils = new IndexUtils2D(minLon, minLat, maxLon, maxLat, maxOrdinates);
-        }
+        final IndexUtils indexUtils = new IndexUtils(minLon, minLat, maxLon, maxLat, maxOrdinates);;
 
         Job jobWholeTrajectory = Job.getInstance();
         Job jobTrajectorySegments = Job.getInstance();
@@ -120,7 +111,7 @@ public class Knn2DQueriesDirectoriesOptimized {
             long startTime = System.currentTimeMillis();
 
             int pointsCount = countPoints(query);
-            SpatioTemporalPoint[] trajectoryQuery = new SpatioTemporalPoint[pointsCount];
+            SpatialPoint[] trajectoryQuery = new SpatialPoint[pointsCount];
             char[] chars = query.toCharArray();
             int ichar = 0;
             int idx = 0;
@@ -153,7 +144,7 @@ public class Knn2DQueriesDirectoriesOptimized {
                 long tstp = parseLong(chars, start, ichar);
                 ichar++; // skip ';'
 
-                trajectoryQuery[idx++] = new SpatioTemporalPoint(lon,lat,tstp);
+                trajectoryQuery[idx++] = new SpatialPoint(lon,lat);
 
                 if(Double.compare(lon,mbrMaxLongitude)==1){
                     mbrMaxLongitude = lon;
@@ -164,7 +155,6 @@ public class Knn2DQueriesDirectoriesOptimized {
                 if(Double.compare(tstp,mbrMaxTimestamp)==1){
                     mbrMaxTimestamp = tstp;
                 }
-
                 if(Double.compare(lon,mbrMinLongitude)==-1){
                     mbrMinLongitude = lon;
                 }
@@ -184,73 +174,20 @@ public class Knn2DQueriesDirectoriesOptimized {
             final double queryMaxLatitude = Double.min(maxLat-0.0000001,mbrMaxLatitude);
 //            final long queryMaxTimestamp = maxTime-1000;
 
-            long[] hilStart = indexUtils.scale(queryMinLongitude, queryMinLatitude, minTime);
-            long[] hilEnd = indexUtils.scale(queryMaxLongitude, queryMaxLatitude, maxTime-1000);
+            long[] hilStart = indexUtils.scale(queryMinLongitude, queryMinLatitude);
+            long[] hilEnd = indexUtils.scale(queryMaxLongitude, queryMaxLatitude);
 //            Ranges ranges = hilbertCurve.query(hilStart, hilEnd, 0);
             final HashSet<Long> initialCubes = new HashSet<>();
 
             StringBuilder sb = new StringBuilder();
-            if(indexUtils instanceof IndexUtils2D){
-                for (SpatioTemporalPoint spatioTemporalPoint : trajectoryQuery) {
-                    long[] p = indexUtils.scale(spatioTemporalPoint.getLongitude(), spatioTemporalPoint.getLatitude(), minTime);
+                for (SpatialPoint spatialPoint : trajectoryQuery) {
+                    long[] p = indexUtils.scale(spatialPoint.getLongitude(), spatialPoint.getLatitude());
                     long r = hilbertCurve.index(p);
                     if(!initialCubes.contains(r)){
                         sb.append(parquetPath+File.separator+"stIndex"+File.separator+r+",");
                         initialCubes.add(r);
                     }
                 }
-//                for (Range range : ranges.toList()) {
-//                    for (long r = range.low(); r <= range.high(); r++) {
-//                        if(directoriesSet.contains(String.valueOf(r))) {
-//                            long[] cube = hilbertCurve.point(r);
-//                            double xMin = minLon + (cube[0] * (maxLon-minLon)/(maxOrdinates+ 1L));
-//                            double yMin = minLat + (cube[1] * (maxLat-minLat)/(maxOrdinates+ 1L));
-//
-//                            double xMax = minLon + ((cube[0]+1) * (maxLon-minLon)/(maxOrdinates+ 1L));
-//                            double yMax = minLat + ((cube[1]+1) * (maxLat-minLat)/(maxOrdinates+ 1L));
-//
-//                            if(doesTrajectoryIntersectWithCube(trajectoryQuery, xMin, yMin, xMax, yMax)){
-//                                sb.append(parquetPath+File.separator+"stIndex"+File.separator+r+",");
-//                                initialCubes.add(r);
-//                            }
-//                        }
-//                    }
-//                }
-            }else{
-                for (SpatioTemporalPoint spatioTemporalPoint : trajectoryQuery) {
-                    long[] p = indexUtils.scale(spatioTemporalPoint.getLongitude(), spatioTemporalPoint.getLatitude(), minTime);
-                    long r = hilbertCurve.index(p);
-                    if(!initialCubes.contains(r)){
-                        initialCubes.add(r);
-                        for (long t = hilStart[2]; t <= hilEnd[2]; t++) {
-                                long cubeId = hilbertCurve.index(p[0],p[1],t);
-                                if(directoriesSet.contains(String.valueOf(cubeId))) {
-                                    sb.append(parquetPath+File.separator+"stIndex"+File.separator+cubeId+",");
-                                }
-                            }
-                    }
-                }
-
-//                for (long i = hilStart[0]; i <= hilEnd[0]; i++) {
-//                    for (long j = hilStart[1]; j <= hilEnd[1]; j++) {
-//                        double xMin = minLon + (i * (maxLon - minLon) / (maxOrdinates + 1L));
-//                        double yMin = minLat + (j * (maxLat - minLat) / (maxOrdinates + 1L));
-//
-//                        double xMax = minLon + ((i + 1) * (maxLon - minLon) / (maxOrdinates + 1L));
-//                        double yMax = minLat + ((j + 1) * (maxLat - minLat) / (maxOrdinates + 1L));
-//
-//                        if(doesTrajectoryIntersectWithCube(trajectoryQuery, xMin, yMin, xMax, yMax)) {
-//                            for (long t = hilStart[2]; t <= hilEnd[2]; t++) {
-//                                long cubeId = hilbertCurve.index(i,j,t);
-//                                if(directoriesSet.contains(String.valueOf(cubeId))) {
-//                                    sb.append(parquetPath+File.separator+"stIndex"+File.separator+cubeId+",");
-//                                }
-//                            }
-//                            initialCubes.add(hilbertCurve.index(i,j,0));
-//                        }
-//                    }
-//                }
-            }
 
             HashMap<String, List<TrajectorySegmentWithMetadata>> identifiedTrajSegments = new HashMap<>();
             HashSet<String> flushedTrajectories = new HashSet<>();
@@ -281,7 +218,6 @@ public class Knn2DQueriesDirectoriesOptimized {
             PriorityQueue<CellScore> queueCells = new PriorityQueue<>(Comparator.comparingDouble(CellScore::getScore));
 
             HashSet<Long> temp = new HashSet<>();
-            if(indexUtils instanceof IndexUtils2D){
                 visitedCubes.forEach(c-> {
                     long[] cube = hilbertCurve.point(c);
                     for (long i = Math.max(0, cube[0]-1); i <= Math.min(maxOrdinates, cube[0]+1); i++) {
@@ -295,21 +231,6 @@ public class Knn2DQueriesDirectoriesOptimized {
                         }
                     }
                 });
-            }else{
-                visitedCubes.forEach(c-> {
-                    long[] cube = hilbertCurve.point(c);
-                    for (long i = Math.max(0, cube[0]-1); i <= Math.min(maxOrdinates, cube[0]+1); i++) {
-                        for (long j = Math.max(0, cube[1]-1); j <= Math.min(maxOrdinates, cube[1]+1); j++) {
-                            long cId = hilbertCurve.index(i,j,0);
-                            if(!visitedCubes.contains(cId) && !temp.contains(cId)){
-                                long[] cubeNeighbor = hilbertCurve.point(cId);
-                                temp.add(cId);
-                                queueCells.add(CellScore.newCellScore(cId, HilbertUtil.trajectoryMinDist(minLon + (cubeNeighbor[0] * (maxLon-minLon)/(maxOrdinates+ 1L)),minLat + (cubeNeighbor[1] * (maxLat-minLat)/(maxOrdinates+ 1L)),minLon + ((cubeNeighbor[0]+1) * (maxLon-minLon)/(maxOrdinates+ 1L)),minLat + ((cubeNeighbor[1]+1) * (maxLat-minLat)/(maxOrdinates+ 1L)),trajectoryQuery)));
-                            }
-                        }
-                    }
-                });
-            }
 
             if(flushedTrajectories.size()>=k || queueCells.isEmpty()) {
 
@@ -320,7 +241,7 @@ public class Knn2DQueriesDirectoriesOptimized {
                 }
                 ParquetInputFormat.setFilterPredicate(jobWholeTrajectory.getConfiguration(), filterPredicate);
                 JavaPairRDD<Void, TrajectorySegment> pairRDD = (JavaPairRDD<Void, TrajectorySegment>) jsc.newAPIHadoopFile(parquetPath + File.separator + "idIndex", ParquetInputFormat.class, Void.class, TrajectorySegment.class, jobWholeTrajectory.getConfiguration());
-                List<TrajectoryScore> ts = pairRDD.map(t -> TrajectoryScore.newTrajectoryScore(t._2, HilbertUtil.frechetDistance(trajectoryQuery, t._2.getSpatioTemporalPoints()))).collect();
+                List<TrajectoryScore> ts = pairRDD.map(t -> TrajectoryScore.newTrajectoryScore(t._2, HilbertUtil.frechetDistance(trajectoryQuery, t._2.getSpatialPoints()))).collect();
                 ts.forEach(trajectoryQueue::add);
                 queriedTrajectoriesCounter += flushedTrajectories.size();
                 flushedTrajectories.clear();
@@ -373,7 +294,6 @@ public class Knn2DQueriesDirectoriesOptimized {
                 while(z>0) {
                     long cell = queueCells.poll().getCellId();
                     visitedCubes.add(cell);
-                    if (indexUtils instanceof IndexUtils2D) {
                         long[] cube = hilbertCurve.point(cell);
                         for (long i = Math.max(0, cube[0] - 1); i <= Math.min(maxOrdinates, cube[0] + 1); i++) {
                             for (long j = Math.max(0, cube[1] - 1); j <= Math.min(maxOrdinates, cube[1] + 1); j++) {
@@ -389,25 +309,6 @@ public class Knn2DQueriesDirectoriesOptimized {
                         if (directoriesSet.contains(j)) {
                             sb.append(parquetPath + File.separator + "stIndex" + File.separator + j + "/,");
                         }
-                    } else {
-                        long[] cube = hilbertCurve.point(cell);
-                        for (long i = Math.max(0, cube[0] - 1); i <= Math.min(maxOrdinates, cube[0] + 1); i++) {
-                            for (long j = Math.max(0, cube[1] - 1); j <= Math.min(maxOrdinates, cube[1] + 1); j++) {
-                                long cId = hilbertCurve.index(i, j, 0);
-                                if (!visitedCubes.contains(cId) && !temp.contains(cId)) {
-                                    long[] cubeNeighbor = hilbertCurve.point(cId);
-                                    temp.add(cId);
-                                    queueCells.add(CellScore.newCellScore(cId, HilbertUtil.trajectoryMinDist(minLon + (cubeNeighbor[0] * (maxLon - minLon) / (maxOrdinates + 1L)), minLat + (cubeNeighbor[1] * (maxLat - minLat) / (maxOrdinates + 1L)), minLon + ((cubeNeighbor[0] + 1) * (maxLon - minLon) / (maxOrdinates + 1L)), minLat + ((cubeNeighbor[1] + 1) * (maxLat - minLat) / (maxOrdinates + 1L)), trajectoryQuery)));
-                                }
-                            }
-                        }
-                        for (long i = hilStart[2]; i <= hilEnd[2]; i++) {//TIME NEEDED
-                            String j = String.valueOf(hilbertCurve.index(cube[0], cube[1], i));
-                            if (directoriesSet.contains(j)) {
-                                sb.append(parquetPath + File.separator + "stIndex" + File.separator + j + "/,");
-                            }
-                        }
-                    }
                     z--;
                 }
 
@@ -481,7 +382,7 @@ public class Knn2DQueriesDirectoriesOptimized {
                     ParquetInputFormat.setFilterPredicate(jobWholeTrajectory.getConfiguration(), filterPredicate);
                     JavaPairRDD<Void, TrajectorySegment> pairRDD = (JavaPairRDD<Void, TrajectorySegment>) jsc.newAPIHadoopFile(parquetPath + "/" + "idIndex", ParquetInputFormat.class, Void.class, TrajectorySegment.class, jobWholeTrajectory.getConfiguration());
 
-                    List<TrajectoryScore> ts = pairRDD.map(t -> TrajectoryScore.newTrajectoryScore(t._2, HilbertUtil.frechetDistance(trajectoryQuery, t._2.getSpatioTemporalPoints()))).collect();
+                    List<TrajectoryScore> ts = pairRDD.map(t -> TrajectoryScore.newTrajectoryScore(t._2, HilbertUtil.frechetDistance(trajectoryQuery, t._2.getSpatialPoints()))).collect();
                     ts.forEach(trajectoryQueue::add);
                     queriedTrajectoriesCounter += flushedTrajectories.size();
 

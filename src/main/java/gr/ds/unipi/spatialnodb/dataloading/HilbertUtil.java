@@ -1,5 +1,6 @@
 package gr.ds.unipi.spatialnodb.dataloading;
 
+import gr.ds.unipi.spatialnodb.messages.common.SpatialPoint;
 import gr.ds.unipi.spatialnodb.messages.common.SpatioTemporalPoint;
 import gr.ds.unipi.spatialnodb.shapes.Point;
 import gr.ds.unipi.spatialnodb.shapes.STPoint;
@@ -229,27 +230,27 @@ public class HilbertUtil {
     }
 
 
-    public static boolean doesTrajectoryIntersectWithCube(SpatioTemporalPoint[] spt, double xMin, double yMin, double xMax, double yMax){
-        for (int i = 0; i < spt.length-1; i++) {
-            if(doesLineIntersectWithCube(spt[i].getLongitude(), spt[i].getLatitude(),spt[i+1].getLongitude(), spt[i+1].getLatitude(), xMin, yMin, xMax, yMax )){
+    public static boolean doesTrajectoryIntersectWithCube(SpatialPoint[] sp, double xMin, double yMin, double xMax, double yMax){
+        for (int i = 0; i < sp.length-1; i++) {
+            if(doesLineIntersectWithCube(sp[i].getLongitude(), sp[i].getLatitude(),sp[i+1].getLongitude(), sp[i+1].getLatitude(), xMin, yMin, xMax, yMax )){
                 return true;
             }
         }
         return false;
     }
 
-    public static boolean isTrajectoryDistanceLessThanEpsilonToCube(SpatioTemporalPoint[] spt, double xMin, double yMin, double xMax, double yMax, double epsilon){
-        for (int i = 0; i < spt.length-1; i++) {
-            if(Double.compare(minDistSegmentToRectangle(spt[i].getLongitude(), spt[i].getLatitude(),spt[i+1].getLongitude(), spt[i+1].getLatitude(), xMin, yMin, xMax, yMax ), epsilon) != 1){
+    public static boolean isTrajectoryDistanceLessThanEpsilonToCube(SpatialPoint[] sp, double xMin, double yMin, double xMax, double yMax, double epsilon){
+        for (int i = 0; i < sp.length-1; i++) {
+            if(Double.compare(minDistSegmentToRectangle(sp[i].getLongitude(), sp[i].getLatitude(),sp[i+1].getLongitude(), sp[i+1].getLatitude(), xMin, yMin, xMax, yMax ), epsilon) != 1){
                 return true;
             }
         }
         return false;
     }
 
-    public static boolean areTrajectoryPointsDistanceLessThanEpsilonToCube(SpatioTemporalPoint[] spt, double xMin, double yMin, double xMax, double yMax, double epsilon){
-        for (int i = 0; i < spt.length; i++) {
-            if(Double.compare(minDistPointToRectangle(spt[i].getLongitude(), spt[i].getLatitude(), xMin, yMin, xMax, yMax ), epsilon) != 1){
+    public static boolean areTrajectoryPointsDistanceLessThanEpsilonToCube(SpatialPoint[] sp, double xMin, double yMin, double xMax, double yMax, double epsilon){
+        for (int i = 0; i < sp.length; i++) {
+            if(Double.compare(minDistPointToRectangle(sp[i].getLongitude(), sp[i].getLatitude(), xMin, yMin, xMax, yMax ), epsilon) != 1){
                 return true;
             }
         }
@@ -331,31 +332,31 @@ public class HilbertUtil {
         return (Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2)));
     }
 
-    public static double frechetDistance(SpatioTemporalPoint[] spt1, SpatioTemporalPoint[] spt2) {
+    public static double frechetDistance(SpatialPoint[] sp1, SpatialPoint[] sp2) {
 
-            if(spt1.length > spt2.length){
-                return frechetDistance(spt2, spt1);
+            if(sp1.length > sp2.length){
+                return frechetDistance(sp2, sp1);
             }
 
-            double[] arr = new double[spt1.length];
-            arr[0] = HilbertUtil.euclideanDistance(spt1[0].getLongitude(), spt1[0].getLatitude(), spt2[0].getLongitude(), spt2[0].getLatitude());
-            for (int i = 1; i < spt1.length; i++) {
-                arr[i] = Math.max(arr[i-1],HilbertUtil.euclideanDistance(spt1[i].getLongitude(), spt1[i].getLatitude(), spt2[0].getLongitude(), spt2[0].getLatitude()));
+            double[] arr = new double[sp1.length];
+            arr[0] = HilbertUtil.euclideanDistance(sp1[0].getLongitude(), sp1[0].getLatitude(), sp2[0].getLongitude(), sp2[0].getLatitude());
+            for (int i = 1; i < sp1.length; i++) {
+                arr[i] = Math.max(arr[i-1],HilbertUtil.euclideanDistance(sp1[i].getLongitude(), sp1[i].getLatitude(), sp2[0].getLongitude(), sp2[0].getLatitude()));
             }
 
             double diagonal;
             double value;
-            for (int j = 1; j < spt2.length; j++) {
+            for (int j = 1; j < sp2.length; j++) {
                 diagonal = arr[0];
-                arr[0] = Math.max(HilbertUtil.euclideanDistance(spt1[0].getLongitude(), spt1[0].getLatitude(), spt2[j].getLongitude(), spt2[j].getLatitude()),diagonal);
+                arr[0] = Math.max(HilbertUtil.euclideanDistance(sp1[0].getLongitude(), sp1[0].getLatitude(), sp2[j].getLongitude(), sp2[j].getLatitude()),diagonal);
 
-                for (int i = 1; i < spt1.length; i++) {
-                    value = Math.max(HilbertUtil.euclideanDistance(spt1[i].getLongitude(), spt1[i].getLatitude(), spt2[j].getLongitude(), spt2[j].getLatitude()) ,Math.min(arr[i-1],Math.min(arr[i],diagonal)));
+                for (int i = 1; i < sp1.length; i++) {
+                    value = Math.max(HilbertUtil.euclideanDistance(sp1[i].getLongitude(), sp1[i].getLatitude(), sp2[j].getLongitude(), sp2[j].getLatitude()) ,Math.min(arr[i-1],Math.min(arr[i],diagonal)));
                     diagonal = arr[i];
                     arr[i] = value;
                 }
             }
-            return arr[spt1.length-1];
+            return arr[sp1.length-1];
     }
 
     //assumes that the segment does not intersect with rectangle
@@ -423,29 +424,29 @@ public class HilbertUtil {
     }
 
     //points distance to cube
-    public static boolean isMinDistGreaterThan(double xMin, double yMin, double xMax, double yMax, SpatioTemporalPoint[] spatioTemporalPoints, double epsilon) {
+    public static boolean isMinDistGreaterThan(double xMin, double yMin, double xMax, double yMax, SpatialPoint[] spatialPoints, double epsilon) {
         double minDist = Double.MAX_VALUE;
-        for (SpatioTemporalPoint spatioTemporalPoint : spatioTemporalPoints) {
-            minDist = Double.min(minDist, minDistPointToRectangle(spatioTemporalPoint.getLongitude(), spatioTemporalPoint.getLatitude(), xMin, yMin, xMax, yMax));
+        for (SpatialPoint st : spatialPoints) {
+            minDist = Double.min(minDist, minDistPointToRectangle(st.getLongitude(), st.getLatitude(), xMin, yMin, xMax, yMax));
             if(Double.compare(minDist, epsilon) != 1){return false;}
         }
         return true;
     }
 
     //points distance to cube
-    public static boolean isPointMinDistGreaterThan(double x, double y, SpatioTemporalPoint[] spatioTemporalPoints, double epsilon) {
+    public static boolean isPointMinDistGreaterThan(double x, double y, SpatialPoint[] spatialPoints, double epsilon) {
         double minDist = Double.MAX_VALUE;
-        for (SpatioTemporalPoint spatioTemporalPoint : spatioTemporalPoints) {
-            minDist = Double.min(minDist, HilbertUtil.euclideanDistance(x, y,spatioTemporalPoint.getLongitude(), spatioTemporalPoint.getLatitude()));
+        for (SpatialPoint sp : spatialPoints) {
+            minDist = Double.min(minDist, HilbertUtil.euclideanDistance(x, y,sp.getLongitude(), sp.getLatitude()));
             if(Double.compare(minDist, epsilon) != 1){return false;}
         }
         return true;
     }
 
-    public static double trajectoryMinDist(double xMin, double yMin, double xMax, double yMax, SpatioTemporalPoint[] spatioTemporalPoints) {
+    public static double trajectoryMinDist(double xMin, double yMin, double xMax, double yMax, SpatialPoint[] spatialPoints) {
         double minDist = Double.MAX_VALUE;
-        for (SpatioTemporalPoint spatioTemporalPoint : spatioTemporalPoints) {
-            minDist = Double.min(minDist, minDistPointToRectangle(spatioTemporalPoint.getLongitude(), spatioTemporalPoint.getLatitude(), xMin, yMin, xMax, yMax));
+        for (SpatialPoint sp : spatialPoints) {
+            minDist = Double.min(minDist, minDistPointToRectangle(sp.getLongitude(), sp.getLatitude(), xMin, yMin, xMax, yMax));
         }
 //        for (int i = 1; i < spatioTemporalPoints.length; i++) {
 //            minDist = Double.min(minDist, minDistSegmentToRectangle(spatioTemporalPoints[i-1].getLongitude(),  spatioTemporalPoints[i-1].getLatitude(), spatioTemporalPoints[i].getLongitude(), spatioTemporalPoints[i].getLatitude(),xMin, yMin, xMax, yMax));

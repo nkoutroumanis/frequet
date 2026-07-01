@@ -63,20 +63,11 @@ public class Frechet2DQueriesDirectoriesIntervalsPivots {
         final double maxLon = boundaries.getDouble("maxLon");
         final double maxLat = boundaries.getDouble("maxLat");
         final long maxTime = boundaries.getLong("maxTime");
-        final String indexType = metadata.getString("indexType");
 
-        final SmallHilbertCurve hilbertCurve = HilbertCurve.small().bits(bits).dimensions(indexType.equals("3D")?3:2);
+        final SmallHilbertCurve hilbertCurve = HilbertCurve.small().bits(bits).dimensions(2);
         final long maxOrdinates = hilbertCurve.maxOrdinate();
 
-        final IndexUtils indexUtils;
-        if(!(indexType.equals("2D") || indexType.equals("3D"))) {
-            throw new IllegalArgumentException("The index parameter must be either 2D or 3D");
-        }
-        if(indexType.equals("3D")) {
-            indexUtils = new IndexUtils3D(minLon, minLat, minTime, maxLon, maxLat, maxTime, maxOrdinates);
-        }else {
-            indexUtils = new IndexUtils2D(minLon, minLat, maxLon, maxLat, maxOrdinates);
-        }
+        final IndexUtils indexUtils = new IndexUtils(minLon, minLat, maxLon, maxLat, maxOrdinates);;
 
         Job jobIntersected = Job.getInstance();
         Job jobFullyContains = Job.getInstance();
@@ -118,7 +109,7 @@ public class Frechet2DQueriesDirectoriesIntervalsPivots {
             long startTime = System.currentTimeMillis();
 
             int pointsCount = countPoints(query);
-            SpatioTemporalPoint[] trajectoryQuery = new SpatioTemporalPoint[pointsCount];
+            SpatialPoint[] trajectoryQuery = new SpatialPoint[pointsCount];
             char[] chars = query.toCharArray();
             int ichar = 0;
             int idx = 0;
@@ -151,7 +142,7 @@ public class Frechet2DQueriesDirectoriesIntervalsPivots {
                 long tstp = parseLong(chars, start, ichar);
                 ichar++; // skip ';'
 
-                trajectoryQuery[idx++] = new SpatioTemporalPoint(lon,lat,tstp);
+                trajectoryQuery[idx++] = new SpatialPoint(lon,lat);
 
                 if(Double.compare(lon,mbrMaxLongitude)==1){
                     mbrMaxLongitude = lon;
@@ -186,13 +177,12 @@ public class Frechet2DQueriesDirectoriesIntervalsPivots {
 
             ParquetInputFormat.setFilterPredicate(jobIntersected.getConfiguration(), and(and(xAxis, yAxis), notNullInterval));
 
-            long[] hilStart = indexUtils.scale(queryMinLongitude, queryMinLatitude, minTime);//HilbertUtil.scaleGeoTemporalPoint(queryMinLongitude, minLon, maxLon,queryMinLatitude, minLat, maxLat, queryMinTimestamp, minTime, maxTime, maxOrdinates);
-            long[] hilEnd = indexUtils.scale(queryMaxLongitude, queryMaxLatitude, maxTime-1000);//HilbertUtil.scaleGeoTemporalPoint(queryMaxLongitude, minLon, maxLon, queryMaxLatitude, minLat, maxLat, queryMaxTimestamp, minTime, maxTime, maxOrdinates);
+            long[] hilStart = indexUtils.scale(queryMinLongitude, queryMinLatitude);//HilbertUtil.scaleGeoTemporalPoint(queryMinLongitude, minLon, maxLon,queryMinLatitude, minLat, maxLat, queryMinTimestamp, minTime, maxTime, maxOrdinates);
+            long[] hilEnd = indexUtils.scale(queryMaxLongitude, queryMaxLatitude);//HilbertUtil.scaleGeoTemporalPoint(queryMaxLongitude, minLon, maxLon, queryMaxLatitude, minLat, maxLat, queryMaxTimestamp, minTime, maxTime, maxOrdinates);
             Ranges ranges = hilbertCurve.query(hilStart, hilEnd, 0);
             StringBuilder sbFullyCovers = new StringBuilder();
             StringBuilder sbIntersected = new StringBuilder();
 
-            if(indexUtils instanceof IndexUtils2D){
                 boolean flag = false;
                 for (Range range : ranges.toList()) {
                     for (long r = range.low(); r <= range.high(); r++) {
@@ -221,30 +211,7 @@ public class Frechet2DQueriesDirectoriesIntervalsPivots {
                         }
                     }
                 }
-            }else{
-                for (long i = hilStart[0]; i <= hilEnd[0]; i++) {
-                    for (long j = hilStart[1]; j <= hilEnd[1]; j++) {
-                        double xMin = minLon + (i * (maxLon-minLon)/(maxOrdinates+ 1L));
-                        double yMin = minLat + (j * (maxLat-minLat)/(maxOrdinates+ 1L));
 
-                        double xMax = minLon + ((i+1) * (maxLon-minLon)/(maxOrdinates+ 1L));
-                        double yMax = minLat + ((j+1) * (maxLat-minLat)/(maxOrdinates+ 1L));
-
-                        if(areTrajectoryPointsDistanceLessThanEpsilonToCube(trajectoryQuery, xMin, yMin, xMax, yMax,epsilon)) {
-                            for (long k = hilStart[2]; k <= hilEnd[2]; k++) {
-                                long cubeId = hilbertCurve.index(i,j,k);
-                                if(directoriesSet.contains(String.valueOf(cubeId))) {
-                                    if(i==hilStart[0] || i==hilEnd[0] || j==hilStart[1] || j==hilEnd[1] || k==hilStart[2] || k==hilEnd[2]){
-                                        sbIntersected.append(parquetPath+ File.separator+"stIndex"+File.separator+cubeId+",");
-                                    }else{
-                                        sbFullyCovers.append(parquetPath+ File.separator+"stIndex"+File.separator+cubeId+",");
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
             long parseAndCubeIndex = System.currentTimeMillis() - startTime;
 
             if(sbIntersected.length()==0 && sbFullyCovers.length()==0){
@@ -315,17 +282,17 @@ public class Frechet2DQueriesDirectoriesIntervalsPivots {
                         List<TrajectorySegment> ts = new ArrayList<>(trSegments.size());
                         trSegments.forEach(e->ts.add(e.getTrajectorySegment()));
 
-                        return Collections.singletonList(new Tuple2<Void, TrajectorySegment>(null, new TrajectorySegment(f._1,1, ts))).iterator();
+                        return Collections.singletonList(new Tuple2<Void, TrajectorySegment>(null, new TrajectorySegment(f._1, ts))).iterator();
                     })
-                    .filter(f->{ if(Double.compare(HilbertUtil.euclideanDistance(f._2.getSpatioTemporalPoints()[0].getLongitude(),f._2.getSpatioTemporalPoints()[0].getLatitude(),trajectoryQuery[0].getLongitude(),trajectoryQuery[0].getLatitude()),epsilon)!=1
-                            && Double.compare(HilbertUtil.euclideanDistance(f._2.getSpatioTemporalPoints()[f._2.getSpatioTemporalPoints().length-1].getLongitude(),f._2.getSpatioTemporalPoints()[f._2.getSpatioTemporalPoints().length-1].getLatitude(),trajectoryQuery[trajectoryQuery.length-1].getLongitude(),trajectoryQuery[trajectoryQuery.length-1].getLatitude()),epsilon)!=1) {
+                    .filter(f->{ if(Double.compare(HilbertUtil.euclideanDistance(f._2.getSpatialPoints()[0].getLongitude(),f._2.getSpatialPoints()[0].getLatitude(),trajectoryQuery[0].getLongitude(),trajectoryQuery[0].getLatitude()),epsilon)!=1
+                            && Double.compare(HilbertUtil.euclideanDistance(f._2.getSpatialPoints()[f._2.getSpatialPoints().length-1].getLongitude(),f._2.getSpatialPoints()[f._2.getSpatialPoints().length-1].getLatitude(),trajectoryQuery[trajectoryQuery.length-1].getLongitude(),trajectoryQuery[trajectoryQuery.length-1].getLatitude()),epsilon)!=1) {
                             return true;
                         }else{
                             return false;
                         }
                     })
                     .filter(f->{
-                            if(Double.compare(HilbertUtil.frechetDistance(trajectoryQuery, f._2.getSpatioTemporalPoints()),epsilon)!=1){
+                            if(Double.compare(HilbertUtil.frechetDistance(trajectoryQuery, f._2.getSpatialPoints()),epsilon)!=1){
                                 return true;
                             }else{
                                 return false;
@@ -338,7 +305,7 @@ public class Frechet2DQueriesDirectoriesIntervalsPivots {
 
             long numOfPoints = 0;
             for (Tuple2<Void, TrajectorySegment> voidTrajectoryTuple2 : trajs) {
-                numOfPoints = numOfPoints + voidTrajectoryTuple2._2.getSpatioTemporalPoints().length;
+                numOfPoints = numOfPoints + voidTrajectoryTuple2._2.getSpatialPoints().length;
             }
 
             bw.write((endTime - startTime)+"\t"+num+"\t"+numOfPoints+"\t"+"true"+"\t"+DataPage.counter+"\t"+parseAndCubeIndex);

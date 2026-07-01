@@ -56,9 +56,6 @@ public class DataLoadingDirectoriesWithWholeTrajectories {
         final String metricsPathExport = dataLoading.getString("metricsPathExport");
         final String indexType = dataLoading.getString("indexType");
         final IndexUtils indexUtils;
-        if(!(indexType.equals("2D") || indexType.equals("3D"))) {
-            throw new IllegalArgumentException("The index parameter must be either 2D or 3D");
-        }
         Config hilbert = dataLoading.getConfig("hilbert");
 
         final int bits = hilbert.getInt("bits");
@@ -142,7 +139,7 @@ public class DataLoadingDirectoriesWithWholeTrajectories {
                     maxTimestamp = spts[j].getTimestamp();
                 }
             }
-            return new TrajectorySegment(objectId, 0, spts, minLongitude, minLatitude, minTimestamp, maxLongitude, maxLatitude, maxTimestamp);
+            return new TrajectorySegment(objectId, spts, minLongitude, minLatitude, maxLongitude, maxLatitude);
         }).cache();
 
         trajectoriesRDD.mapToPair(f-> Tuple2.apply(f.getObjectId(), f)).sortByKey().mapToPair(f->Tuple2.apply(null, f._2)).saveAsNewAPIHadoopFile(writePath+File.separator+"idIndex", Void.class, TrajectorySegment.class, ParquetOutputFormat.class, job.getConfiguration());
@@ -155,16 +152,11 @@ public class DataLoadingDirectoriesWithWholeTrajectories {
 
         final double minLon = bounds.getMinLongitude();
         final double minLat = bounds.getMinLatitude();
-        final long minTime = bounds.getMinTimestamp();
         final double maxLon = bounds.getMaxLongitude()+0.0000001;
         final double maxLat = bounds.getMaxLatitude()+0.0000001;
-        final long maxTime = bounds.getMaxTimestamp()+1000;
 
-        if(indexType.equals("3D")) {
-            indexUtils = new IndexUtils3D(minLon, minLat, minTime, maxLon, maxLat, maxTime, maxOrdinates);
-        }else {
-            indexUtils = new IndexUtils2D(minLon, minLat, maxLon, maxLat, maxOrdinates);
-        }
+        indexUtils = new IndexUtils(minLon, minLat, maxLon, maxLat, maxOrdinates);
+
 
         ParquetOutputFormat.setWriteSupportClass(job, TrajectorySegmentWithMetadataWriteSupport.class);
         JavaPairRDD segmentedTrajectoriesRDD = trajectoriesRDD.flatMapToPair(f-> {
