@@ -35,7 +35,7 @@ import static gr.ds.unipi.spatialnodb.AppConfig.loadConfig;
 import static gr.ds.unipi.spatialnodb.dataloading.HilbertUtil.areTrajectoryPointsDistanceLessThanEpsilonToCube;
 import static org.apache.parquet.filter2.predicate.FilterApi.*;
 
-public class Frechet2DQueriesDirectoriesIntervalsMBRVar1 {
+public class Frechet2DQueriesDirectoriesIntervalsDistancesVar1 {
     public static void main(String args[]) throws IOException {
 
         Config config = loadConfig("queries.conf");
@@ -245,11 +245,6 @@ public class Frechet2DQueriesDirectoriesIntervalsMBRVar1 {
 
             pairRDDRangeQuery = pairRDDRangeQuery.filter(f -> {
                 SpatialPoint[] spatialPoints = f._2().getTrajectorySegment().getSpatialPoints();
-//                for (int i = 0; i < spatialPoints.length; i++) {
-//                    if(!HilbertUtil.pointInRectangle(spatialPoints[i].getLongitude(), spatialPoints[i].getLatitude(),queryMinLongitude, queryMinLatitude, queryMaxLongitude, queryMaxLatitude)) {
-//                        return false;
-//                    }
-//                }
 
                 if(f._2.getInterval()[0]==1){
                     if(Double.compare(HilbertUtil.euclideanDistance(spatialPoints[0].getLongitude(),spatialPoints[0].getLatitude(),trajectoryQuery[0].getLongitude(),trajectoryQuery[0].getLatitude()),epsilon)==1){
@@ -263,9 +258,11 @@ public class Frechet2DQueriesDirectoriesIntervalsMBRVar1 {
                     }
                 }
 
-                //MBR pruning
-                if(HilbertUtil.isMinDistGreaterThan(f._2.getTrajectorySegment().getMinLongitude(), f._2.getTrajectorySegment().getMinLatitude(), f._2.getTrajectorySegment().getMaxLongitude(), f._2.getTrajectorySegment().getMaxLatitude(), trajectoryQuery, epsilon)){
-                    return false;
+                //All distances pruning
+                for (SpatialPoint spatialPoint : spatialPoints) {
+                    if(HilbertUtil.isPointMinDistGreaterThan(spatialPoint.getLongitude(), spatialPoint.getLatitude(), trajectoryQuery, epsilon)){
+                        return false;
+                    }
                 }
 
                 return true;

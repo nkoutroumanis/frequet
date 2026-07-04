@@ -395,18 +395,23 @@ public class DataLoadingDirectoriesWithWholeTrajectories {
                 (a, b) -> new Tuple2<>(a._1 + b._1, a._2 + b._2)
         );
 
-        Tuple2<Long, Long> stats1 = trajectoriesRDD.map(f->{
-            HashSet<Long> set = new HashSet<>();
-            for (SpatialPoint spatialPoint : f.getSpatialPoints()) {
-                long[] hil = indexUtils.scale(spatialPoint);
-                set.add(((SmallHilbertCurve)smallHilbertCurveBr.getValue()).index(hil));
-            }
-            return set.size();
-        }).aggregate(
-                new Tuple2<>(0L, 0L),
+        Tuple2<Integer, Integer> stats1 = ((JavaPairRDD<Tuple2<String, Object>,TrajectorySegmentWithMetadata>)segmentedTrajectoriesRDD).mapToPair(f->{return Tuple2.apply(f._2.getTrajectorySegment().getObjectId(), f._2.getTrajectorySegment().getSpatialPoints().length);}).values().aggregate(
+                new Tuple2<>(0, 0),
                 (acc, v) -> new Tuple2<>(acc._1 + v, acc._2 + 1),
                 (a, b) -> new Tuple2<>(a._1 + b._1, a._2 + b._2)
         );
+//        Tuple2<Long, Long> stats1 = trajectoriesRDD.map(f->{
+//            HashSet<Long> set = new HashSet<>();
+//            for (SpatialPoint spatialPoint : f.getSpatialPoints()) {
+//                long[] hil = indexUtils.scale(spatialPoint);
+//                set.add(((SmallHilbertCurve)smallHilbertCurveBr.getValue()).index(hil));
+//            }
+//            return set.size();
+//        }).aggregate(
+//                new Tuple2<>(0L, 0L),
+//                (acc, v) -> new Tuple2<>(acc._1 + v, acc._2 + 1),
+//                (a, b) -> new Tuple2<>(a._1 + b._1, a._2 + b._2)
+//        );
 
 
         long endTime = System.currentTimeMillis();
@@ -419,7 +424,9 @@ public class DataLoadingDirectoriesWithWholeTrajectories {
                 .withValue("gridHilbert.boundaries.maxLon", ConfigValueFactory.fromAnyRef(maxLon))
                 .withValue("gridHilbert.boundaries.maxLat", ConfigValueFactory.fromAnyRef(maxLat))
                 .withValue("gridHilbert.averageIntersectedCellsPerTrajectory", ConfigValueFactory.fromAnyRef((double) stats._1 / stats._2))
-                .withValue("gridHilbert.averageIntersectedCellsPerPointTrajectory", ConfigValueFactory.fromAnyRef((double) stats1._1 / stats1._2))
+                .withValue("gridHilbert.totalNumberOfPoints", ConfigValueFactory.fromAnyRef(stats1._1))
+                .withValue("gridHilbert.totalNumberOfTracklets", ConfigValueFactory.fromAnyRef(stats1._2))
+                .withValue("gridHilbert.averageNumberOfPointsPerTracklet", ConfigValueFactory.fromAnyRef((double) stats1._1/ stats1._2))
                 .withValue("gridHilbert.numOfTrajectories", ConfigValueFactory.fromAnyRef(stats._2));
 
         String json = metadataFile.root().render(

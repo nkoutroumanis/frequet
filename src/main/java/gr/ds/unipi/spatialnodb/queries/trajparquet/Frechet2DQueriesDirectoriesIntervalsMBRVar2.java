@@ -252,13 +252,6 @@ public class Frechet2DQueriesDirectoriesIntervalsMBRVar2 {
                     return false;
                 }
 
-                //All distances pruning
-                for (SpatialPoint spatialPoint : spatialPoints) {
-                    if(HilbertUtil.isPointMinDistGreaterThan(spatialPoint.getLongitude(), spatialPoint.getLatitude(), trajectoryQuery, epsilon)){
-                        return false;
-                    }
-                }
-
                 return true;
             });
 
