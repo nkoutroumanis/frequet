@@ -3,6 +3,7 @@ package gr.ds.unipi.spatialnodb.messages.common.trajparquet;
 import gr.ds.unipi.spatialnodb.messages.common.SpatialPoint;
 
 import java.io.Serializable;
+import java.util.Arrays;
 
 public class TrajectorySegmentWithMetadata implements Serializable {
 
@@ -32,4 +33,12 @@ public class TrajectorySegmentWithMetadata implements Serializable {
         return interval;
     }
 
+    @Override
+    public String toString() {
+        return "TrajectorySegmentWithMetadata{" +
+                "trajectorySegment=" + trajectorySegment +
+                ", pivots=" + Arrays.toString(pivots) +
+                ", interval=" + Arrays.toString(interval) +
+                '}';
+    }
 }

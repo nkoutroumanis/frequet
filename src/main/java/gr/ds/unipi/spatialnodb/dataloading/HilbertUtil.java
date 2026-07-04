@@ -109,6 +109,7 @@ public class HilbertUtil {
     }
 
     public static boolean pointInRectangle(double x, double y, double xmin, double ymin, double xmax, double ymax) {
+        //is not inclusive in upper boundary
         return Double.compare(x, xmax) == -1 && Double.compare(x, xmin) != -1
                 && Double.compare(y, ymax) == -1 && Double.compare(y, ymin) != -1;
     }

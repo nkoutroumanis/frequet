@@ -3,6 +3,7 @@ package gr.ds.unipi.spatialnodb.queries.trajparquet;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
 import gr.ds.unipi.spatialnodb.dataloading.HilbertUtil;
+import gr.ds.unipi.spatialnodb.messages.common.SpatialPoint;
 import gr.ds.unipi.spatialnodb.messages.common.SpatioTemporalPoint;
 import gr.ds.unipi.spatialnodb.messages.common.trajparquet.*;
 import org.apache.hadoop.fs.FileStatus;
@@ -86,7 +87,7 @@ public class KnnQueriesDirectoriesBruteForce {
         while ((query = br.readLine()) != null) {
 
             int pointsCount = countPoints(query);
-            SpatioTemporalPoint[] trajectoryQuery = new SpatioTemporalPoint[pointsCount];
+            SpatialPoint[] trajectoryQuery = new SpatialPoint[pointsCount];
             char[] chars = query.toCharArray();
             int ichar = 0;
             int idx = 0;
@@ -119,7 +120,7 @@ public class KnnQueriesDirectoriesBruteForce {
                 long tstp = parseLong(chars, start, ichar);
                 ichar++; // skip ';'
 
-                trajectoryQuery[idx++] = new SpatioTemporalPoint(lon,lat,tstp);
+                trajectoryQuery[idx++] = new SpatialPoint(lon,lat);
 
                 if(Double.compare(lon,mbrMaxLongitude)==1){
                     mbrMaxLongitude = lon;
@@ -146,7 +147,7 @@ public class KnnQueriesDirectoriesBruteForce {
 //            System.exit(0);
 
             JavaPairRDD<Void, TrajectorySegment> pairRDD = (JavaPairRDD<Void, TrajectorySegment>) jsc.newAPIHadoopFile(parquetPath + "/" + "idIndex", ParquetInputFormat.class, Void.class, TrajectorySegment.class, job.getConfiguration());
-            List<TrajectoryScore> ts = pairRDD.map(t -> TrajectoryScore.newTrajectoryScore(t._2, HilbertUtil.frechetDistance(trajectoryQuery, t._2.getSpatioTemporalPoints()))).collect();
+            List<TrajectoryScore> ts = pairRDD.map(t -> TrajectoryScore.newTrajectoryScore(t._2, HilbertUtil.frechetDistance(trajectoryQuery, t._2.getSpatialPoints()))).collect();
             BoundedPriorityQueue trajectoryQueue = BoundedPriorityQueue.newBoundedPriorityQueue(k);
             ts.forEach(trajectoryQueue::add);
 
@@ -159,23 +160,23 @@ public class KnnQueriesDirectoriesBruteForce {
         }
     }
 
-    private static void flush(HashMap<String, List<TrajectorySegment>> identifiedTrajectories, HashSet<String> flushedtrajectories){
-        identifiedTrajectories.entrySet().removeIf(e->{
-            if(e.getValue().get(0).getSegment()==-1){
-                flushedtrajectories.add(e.getValue().get(0).getObjectId());
-                return true;
-            }else if(e.getValue().get(0).getSegment()==1 && e.getValue().get(e.getValue().size()-1).getSegment()<1){
-                for (int i = 0; i < e.getValue().size()-1; i++) {
-                    if(e.getValue().get(i).getSegment()+1!=Math.abs(e.getValue().get(i+1).getSegment())){
-                        return false;
-                    }
-                }
-                flushedtrajectories.add(e.getValue().get(0).getObjectId());
-                return true;
-            }
-            return false;
-        });
-    }
+//    private static void flush(HashMap<String, List<TrajectorySegment>> identifiedTrajectories, HashSet<String> flushedtrajectories){
+//        identifiedTrajectories.entrySet().removeIf(e->{
+//            if(e.getValue().get(0).getSegment()==-1){
+//                flushedtrajectories.add(e.getValue().get(0).getObjectId());
+//                return true;
+//            }else if(e.getValue().get(0).getSegment()==1 && e.getValue().get(e.getValue().size()-1).getSegment()<1){
+//                for (int i = 0; i < e.getValue().size()-1; i++) {
+//                    if(e.getValue().get(i).getSegment()+1!=Math.abs(e.getValue().get(i+1).getSegment())){
+//                        return false;
+//                    }
+//                }
+//                flushedtrajectories.add(e.getValue().get(0).getObjectId());
+//                return true;
+//            }
+//            return false;
+//        });
+//    }
 
     private static int countPoints(String line) {
         int count = 0;

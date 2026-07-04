@@ -16,7 +16,7 @@ public class HilbertKeyPartitioner extends Partitioner {
 
     @Override
     public int getPartition(Object key) {
-        HilbertKeyTimestamp k = (HilbertKeyTimestamp) key;
+        HilbertKeyLongitude k = (HilbertKeyLongitude) key;
         return (int) (Math.abs(k.getHilbertKey()) % n);
     }
 }

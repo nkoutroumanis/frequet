@@ -44,28 +44,19 @@ public class TrajectorySegment implements Serializable {
         if(trajectorySegments.size()!=1) {
             this.objectId = objectId;
 
-            int spatialPointsNum = trajectorySegments.get(0).getSpatialPoints().length - 1;
-            spatialPointsNum = spatialPointsNum + trajectorySegments.get(trajectorySegments.size() - 1).getSpatialPoints().length - 1;
+            int spatialPointsNum = 0;
 
-            for (int i = 1; i < trajectorySegments.size() - 1; i++) {
-                spatialPointsNum = spatialPointsNum + (trajectorySegments.get(i).getSpatialPoints().length - 2);
+            for (int i = 0; i < trajectorySegments.size(); i++) {
+                spatialPointsNum = spatialPointsNum + (trajectorySegments.get(i).getSpatialPoints().length);
             }
 
             this.spatialPoints = new SpatialPoint[spatialPointsNum];
             int arrayIndex = 0;
 
-            for (int i = 0; i < trajectorySegments.get(0).spatialPoints.length - 1; i++) {
-                spatialPoints[arrayIndex++] = trajectorySegments.get(0).spatialPoints[i];
-            }
-
-            for (int i = 1; i < trajectorySegments.size() - 1; i++) {
-                for (int j = 1; j < trajectorySegments.get(i).getSpatialPoints().length - 1; j++) {
-                    spatialPoints[arrayIndex++] = trajectorySegments.get(i).getSpatialPoints()[j];
+            for (int i = 0; i < trajectorySegments.size(); i++) {
+                for (SpatialPoint spatialPoint : trajectorySegments.get(i).getSpatialPoints()) {
+                    spatialPoints[arrayIndex++] = spatialPoint;
                 }
-            }
-
-            for (int i = 1; i < trajectorySegments.get(trajectorySegments.size() - 1).spatialPoints.length; i++) {
-                spatialPoints[arrayIndex++] = trajectorySegments.get(trajectorySegments.size() - 1).spatialPoints[i];
             }
         }
         else{
