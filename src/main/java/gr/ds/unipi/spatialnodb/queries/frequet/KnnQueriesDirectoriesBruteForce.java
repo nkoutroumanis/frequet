@@ -1,4 +1,4 @@
-package gr.ds.unipi.spatialnodb.queries.trajparquet;
+package gr.ds.unipi.spatialnodb.queries.frequet;
 
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
@@ -81,7 +81,7 @@ public class KnnQueriesDirectoriesBruteForce {
 
         List<Long> times = new ArrayList<>();
 
-        BufferedWriter bw = new BufferedWriter(new FileWriter(pathExport+ File.separator+"knn-queries-bruteForce-trajparquet-"+ Paths.get(queriesFilePath).getFileName().toString().replaceFirst("\\.[^.]+$", "")+"-"+Paths.get(parquetPath).getFileName().toString()+".txt"));
+        BufferedWriter bw = new BufferedWriter(new FileWriter(pathExport+ File.separator+"knn-queries-bruteForce-frequet-"+ Paths.get(queriesFilePath).getFileName().toString().replaceFirst("\\.[^.]+$", "")+"-"+Paths.get(parquetPath).getFileName().toString()+".txt"));
         BufferedReader br = new BufferedReader(new FileReader(queriesFilePath));
         String query;
         while ((query = br.readLine()) != null) {

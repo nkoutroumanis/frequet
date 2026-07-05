@@ -1,6 +1,5 @@
-package gr.ds.unipi.spatialnodb.queries.trajparquet;
+package gr.ds.unipi.spatialnodb.queries.frequet;
 
-import gr.ds.unipi.spatialnodb.dataloading.HilbertUtil;
 import gr.ds.unipi.spatialnodb.messages.common.trajparquet.CellScore;
 import junit.framework.TestCase;
 

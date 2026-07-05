@@ -1,4 +1,4 @@
-package gr.ds.unipi.spatialnodb.queries.trajparquet;
+package gr.ds.unipi.spatialnodb.queries.frequet;
 
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;

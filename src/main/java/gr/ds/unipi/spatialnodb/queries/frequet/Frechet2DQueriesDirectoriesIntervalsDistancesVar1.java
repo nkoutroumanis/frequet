@@ -1,4 +1,4 @@
-package gr.ds.unipi.spatialnodb.queries.trajparquet;
+package gr.ds.unipi.spatialnodb.queries.frequet;
 
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
@@ -6,7 +6,9 @@ import gr.ds.unipi.spatialnodb.SparkLogParser;
 import gr.ds.unipi.spatialnodb.dataloading.HilbertUtil;
 import gr.ds.unipi.spatialnodb.messages.common.IndexUtils;
 import gr.ds.unipi.spatialnodb.messages.common.SpatialPoint;
-import gr.ds.unipi.spatialnodb.messages.common.trajparquet.*;
+import gr.ds.unipi.spatialnodb.messages.common.trajparquet.TrajectorySegment;
+import gr.ds.unipi.spatialnodb.messages.common.trajparquet.TrajectorySegmentWithIntervalMetadata;
+import gr.ds.unipi.spatialnodb.messages.common.trajparquet.TrajectorySegmentWithIntervalMetadataReadSupport;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -33,7 +35,7 @@ import static gr.ds.unipi.spatialnodb.AppConfig.loadConfig;
 import static gr.ds.unipi.spatialnodb.dataloading.HilbertUtil.areTrajectoryPointsDistanceLessThanEpsilonToCube;
 import static org.apache.parquet.filter2.predicate.FilterApi.*;
 
-public class Frechet2DQueriesDirectoriesIntervalsPivotsVar1 {
+public class Frechet2DQueriesDirectoriesIntervalsDistancesVar1 {
     public static void main(String args[]) throws IOException {
 
         Config config = loadConfig("queries.conf");
@@ -71,8 +73,8 @@ public class Frechet2DQueriesDirectoriesIntervalsPivotsVar1 {
         Job jobIntersected = Job.getInstance();
         Job jobFullyContains = Job.getInstance();
 
-        ParquetInputFormat.setReadSupportClass(jobIntersected, TrajectorySegmentWithMetadataReadSupport.class);
-        ParquetInputFormat.setReadSupportClass(jobFullyContains, TrajectorySegmentWithMetadataReadSupport.class);
+        ParquetInputFormat.setReadSupportClass(jobIntersected, TrajectorySegmentWithIntervalMetadataReadSupport.class);
+        ParquetInputFormat.setReadSupportClass(jobFullyContains, TrajectorySegmentWithIntervalMetadataReadSupport.class);
 
         SparkConf sparkConf = new SparkConf();//.registerKryoClasses(new Class[]{SpatioTemporalPoint.class,SpatioTemporalPoint[].class});/*.setMaster("local[1]").set("spark.executor.memory","1g")*/
         sparkConf.setAppName("Similarity Querying in TrajParquet");
@@ -100,7 +102,8 @@ public class Frechet2DQueriesDirectoriesIntervalsPivotsVar1 {
             }
         }
 
-        BufferedWriter bw = new BufferedWriter(new FileWriter(metricsPath+ File.separator+"frechet-queries-optimized-"+Paths.get(parquetPath).getFileName().toString()+"-"+ Paths.get(queriesFilePath).getFileName().toString().replaceFirst("\\.[^.]+$", "")+".txt"));
+        String fullPathExportedFile = metricsPath+ File.separator+"frechet-queries-distances-var1-"+Paths.get(parquetPath).getFileName().toString()+"-"+ Paths.get(queriesFilePath).getFileName().toString().replaceFirst("\\.[^.]+$", "")+".txt";
+        BufferedWriter bw = new BufferedWriter(new FileWriter(fullPathExportedFile));
         BufferedReader br = new BufferedReader(new FileReader(queriesFilePath));
         bw.write("Time Exec\tNum of Trajectories\tNum of Points\tIssued\tData Pages\tParse\n");
         String query;
@@ -220,16 +223,16 @@ public class Frechet2DQueriesDirectoriesIntervalsPivotsVar1 {
                 continue;
             }
 
-            JavaPairRDD<Void, TrajectorySegmentWithMetadata> pairRDDRangeQuery = null;
+            JavaPairRDD<Void, TrajectorySegmentWithIntervalMetadata> pairRDDRangeQuery = null;
 
             if(sbFullyCovers.length() != 0){
                 sbFullyCovers.deleteCharAt(sbFullyCovers.length()-1);
-                pairRDDRangeQuery = (JavaPairRDD<Void, TrajectorySegmentWithMetadata>) jsc.newAPIHadoopFile(sbFullyCovers.toString(), ParquetInputFormat.class, Void.class, TrajectorySegmentWithMetadata.class, jobFullyContains.getConfiguration());
+                pairRDDRangeQuery = (JavaPairRDD<Void, TrajectorySegmentWithIntervalMetadata>) jsc.newAPIHadoopFile(sbFullyCovers.toString(), ParquetInputFormat.class, Void.class, TrajectorySegmentWithIntervalMetadata.class, jobFullyContains.getConfiguration());
             }
 
             if(sbIntersected.length()!=0){
                 sbIntersected.deleteCharAt(sbIntersected.length()-1);
-                JavaPairRDD<Void, TrajectorySegmentWithMetadata> intersectedPairRDD = (JavaPairRDD<Void, TrajectorySegmentWithMetadata>) jsc.newAPIHadoopFile(sbIntersected.toString(), ParquetInputFormat.class, Void.class, TrajectorySegmentWithMetadata.class, jobIntersected.getConfiguration());
+                JavaPairRDD<Void, TrajectorySegmentWithIntervalMetadata> intersectedPairRDD = (JavaPairRDD<Void, TrajectorySegmentWithIntervalMetadata>) jsc.newAPIHadoopFile(sbIntersected.toString(), ParquetInputFormat.class, Void.class, TrajectorySegmentWithIntervalMetadata.class, jobIntersected.getConfiguration());
                 if(pairRDDRangeQuery==null) {
                     pairRDDRangeQuery = intersectedPairRDD;
                 }
@@ -243,11 +246,6 @@ public class Frechet2DQueriesDirectoriesIntervalsPivotsVar1 {
 
             pairRDDRangeQuery = pairRDDRangeQuery.filter(f -> {
                 SpatialPoint[] spatialPoints = f._2().getTrajectorySegment().getSpatialPoints();
-//                for (int i = 0; i < spatialPoints.length; i++) {
-//                    if(!HilbertUtil.pointInRectangle(spatialPoints[i].getLongitude(), spatialPoints[i].getLatitude(),queryMinLongitude, queryMinLatitude, queryMaxLongitude, queryMaxLatitude)) {
-//                        return false;
-//                    }
-//                }
 
                 if(f._2.getInterval()[0]==1){
                     if(Double.compare(HilbertUtil.euclideanDistance(spatialPoints[0].getLongitude(),spatialPoints[0].getLatitude(),trajectoryQuery[0].getLongitude(),trajectoryQuery[0].getLatitude()),epsilon)==1){
@@ -261,9 +259,9 @@ public class Frechet2DQueriesDirectoriesIntervalsPivotsVar1 {
                     }
                 }
 
-                //Pivot pruning
-                for (SpatialPoint pivot : f._2.getPivots()) {
-                    if(HilbertUtil.isPointMinDistGreaterThan(pivot.getLongitude(), pivot.getLatitude(), trajectoryQuery,epsilon)){
+                //All distances pruning
+                for (SpatialPoint spatialPoint : spatialPoints) {
+                    if(HilbertUtil.isPointMinDistGreaterThan(spatialPoint.getLongitude(), spatialPoint.getLatitude(), trajectoryQuery, epsilon)){
                         return false;
                     }
                 }
@@ -271,13 +269,20 @@ public class Frechet2DQueriesDirectoriesIntervalsPivotsVar1 {
                 return true;
             });
 
+
+//            if(sbFullyCovers.length()!=0){
+//                JavaPairRDD<Void, TrajectorySegmentWithIntervalMetadata> fullyContainedPairRDD = (JavaPairRDD<Void, TrajectorySegmentWithIntervalMetadata>) jsc.newAPIHadoopFile(sbFullyCovers.toString(), ParquetInputFormat.class, Void.class, TrajectorySegmentWithIntervalMetadata.class, jobFullyContains.getConfiguration());
+//                fullyContainedPairRDD = fullyContainedPairRDD.filter(f-> ! (HilbertUtil.isMinDistGreaterThan(f._2.getTrajectorySegment().getMinLongitude(), f._2.getTrajectorySegment().getMinLatitude(), f._2.getTrajectorySegment().getMaxLongitude(), f._2.getTrajectorySegment().getMaxLatitude(), trajectoryQuery, epsilon)));
+//                pairRDDRangeQuery = pairRDDRangeQuery.union(fullyContainedPairRDD);
+//            }
+
             JavaPairRDD<Void, TrajectorySegment> results = pairRDDRangeQuery.groupBy(f->f._2().getTrajectorySegment().getObjectId(), Integer.parseInt(args[0]))
                     .flatMapToPair(f->{
 
-                        List<TrajectorySegmentWithMetadata> trSegments = new ArrayList<>();
+                        List<TrajectorySegmentWithIntervalMetadata> trSegments = new ArrayList<>();
                         f._2.forEach(t->trSegments.add(t._2));
 
-                        Comparator<TrajectorySegmentWithMetadata> comparator = Comparator.comparingLong(d-> d.getInterval()[0]);
+                        Comparator<TrajectorySegmentWithIntervalMetadata> comparator = Comparator.comparingLong(d-> d.getInterval()[0]);
                         trSegments.sort(comparator);
 
                         if(trSegments.size()==1 && trSegments.get(0).getInterval()[0]==1 && trSegments.get(0).getInterval()[1]<0){
@@ -341,7 +346,7 @@ public class Frechet2DQueriesDirectoriesIntervalsPivotsVar1 {
 
             List<Long>[] lists = SparkLogParser.getTimeFromTwoStagesPerJob(eventLogFile.getAbsolutePath());
             try {
-                SparkLogParser.enrichQueryAdHocFile(metricsPath+ File.separator+"frechet-queries-optimized-intervals-"+Paths.get(parquetPath).getFileName().toString()+"-"+ Paths.get(queriesFilePath).getFileName().toString().replaceFirst("\\.[^.]+$", "")+".txt", lists);
+                SparkLogParser.enrichQueryAdHocFile(fullPathExportedFile, lists);
             }catch (Exception e) {
                 e.printStackTrace();
             }

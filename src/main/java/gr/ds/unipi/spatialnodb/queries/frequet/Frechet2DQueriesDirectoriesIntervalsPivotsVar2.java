@@ -1,4 +1,4 @@
-package gr.ds.unipi.spatialnodb.queries.trajparquet;
+package gr.ds.unipi.spatialnodb.queries.frequet;
 
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
@@ -6,9 +6,7 @@ import gr.ds.unipi.spatialnodb.SparkLogParser;
 import gr.ds.unipi.spatialnodb.dataloading.HilbertUtil;
 import gr.ds.unipi.spatialnodb.messages.common.IndexUtils;
 import gr.ds.unipi.spatialnodb.messages.common.SpatialPoint;
-import gr.ds.unipi.spatialnodb.messages.common.trajparquet.TrajectorySegment;
-import gr.ds.unipi.spatialnodb.messages.common.trajparquet.TrajectorySegmentWithIntervalMetadata;
-import gr.ds.unipi.spatialnodb.messages.common.trajparquet.TrajectorySegmentWithIntervalMetadataReadSupport;
+import gr.ds.unipi.spatialnodb.messages.common.trajparquet.*;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -35,7 +33,7 @@ import static gr.ds.unipi.spatialnodb.AppConfig.loadConfig;
 import static gr.ds.unipi.spatialnodb.dataloading.HilbertUtil.areTrajectoryPointsDistanceLessThanEpsilonToCube;
 import static org.apache.parquet.filter2.predicate.FilterApi.*;
 
-public class Frechet2DQueriesDirectoriesIntervalsMBRVar2 {
+public class Frechet2DQueriesDirectoriesIntervalsPivotsVar2 {
     public static void main(String args[]) throws IOException {
 
         Config config = loadConfig("queries.conf");
@@ -72,7 +70,7 @@ public class Frechet2DQueriesDirectoriesIntervalsMBRVar2 {
 
         Job job = Job.getInstance();
 
-        ParquetInputFormat.setReadSupportClass(job, TrajectorySegmentWithIntervalMetadataReadSupport.class);
+        ParquetInputFormat.setReadSupportClass(job, TrajectorySegmentWithMetadataReadSupport.class);
 
         SparkConf sparkConf = new SparkConf();//.registerKryoClasses(new Class[]{SpatioTemporalPoint.class,SpatioTemporalPoint[].class});/*.setMaster("local[1]").set("spark.executor.memory","1g")*/
         sparkConf.setAppName("Similarity Querying in TrajParquet");
@@ -100,7 +98,8 @@ public class Frechet2DQueriesDirectoriesIntervalsMBRVar2 {
             }
         }
 
-        BufferedWriter bw = new BufferedWriter(new FileWriter(metricsPath+ File.separator+"frechet-queries-optimized-"+Paths.get(parquetPath).getFileName().toString()+"-"+ Paths.get(queriesFilePath).getFileName().toString().replaceFirst("\\.[^.]+$", "")+".txt"));
+        String fullPathExportedFile = metricsPath+ File.separator+"frechet-queries-pivots-var2-"+Paths.get(parquetPath).getFileName().toString()+"-"+ Paths.get(queriesFilePath).getFileName().toString().replaceFirst("\\.[^.]+$", "")+".txt";
+        BufferedWriter bw = new BufferedWriter(new FileWriter(fullPathExportedFile));
         BufferedReader br = new BufferedReader(new FileReader(queriesFilePath));
         bw.write("Time Exec\tNum of Trajectories\tNum of Points\tIssued\tData Pages\tParse\n");
         String query;
@@ -229,7 +228,7 @@ public class Frechet2DQueriesDirectoriesIntervalsMBRVar2 {
             }
 
             sb.deleteCharAt(sb.length()-1);
-            JavaPairRDD<Void, TrajectorySegmentWithIntervalMetadata> pairRDDRangeQuery = (JavaPairRDD<Void, TrajectorySegmentWithIntervalMetadata>) jsc.newAPIHadoopFile(sb.toString(), ParquetInputFormat.class, Void.class, TrajectorySegmentWithIntervalMetadata.class, job.getConfiguration());
+            JavaPairRDD<Void, TrajectorySegmentWithMetadata> pairRDDRangeQuery = (JavaPairRDD<Void, TrajectorySegmentWithMetadata>) jsc.newAPIHadoopFile(sb.toString(), ParquetInputFormat.class, Void.class, TrajectorySegmentWithMetadata.class, job.getConfiguration());
 
 
             pairRDDRangeQuery = pairRDDRangeQuery.filter(f -> {
@@ -247,9 +246,11 @@ public class Frechet2DQueriesDirectoriesIntervalsMBRVar2 {
                     }
                 }
 
-                //MBR pruning
-                if(HilbertUtil.isMinDistGreaterThan(f._2.getTrajectorySegment().getMinLongitude(), f._2.getTrajectorySegment().getMinLatitude(), f._2.getTrajectorySegment().getMaxLongitude(), f._2.getTrajectorySegment().getMaxLatitude(), trajectoryQuery, epsilon)){
-                    return false;
+                //Pivot pruning
+                for (SpatialPoint pivot : f._2.getPivots()) {
+                    if(HilbertUtil.isPointMinDistGreaterThan(pivot.getLongitude(), pivot.getLatitude(), trajectoryQuery,epsilon)){
+                        return false;
+                    }
                 }
 
                 return true;
@@ -265,10 +266,10 @@ public class Frechet2DQueriesDirectoriesIntervalsMBRVar2 {
             JavaPairRDD<Void, TrajectorySegment> results = pairRDDRangeQuery.groupBy(f->f._2().getTrajectorySegment().getObjectId(), Integer.parseInt(args[0]))
                     .flatMapToPair(f->{
 
-                        List<TrajectorySegmentWithIntervalMetadata> trSegments = new ArrayList<>();
+                        List<TrajectorySegmentWithMetadata> trSegments = new ArrayList<>();
                         f._2.forEach(t->trSegments.add(t._2));
 
-                        Comparator<TrajectorySegmentWithIntervalMetadata> comparator = Comparator.comparingLong(d-> d.getInterval()[0]);
+                        Comparator<TrajectorySegmentWithMetadata> comparator = Comparator.comparingLong(d-> d.getInterval()[0]);
                         trSegments.sort(comparator);
 
                         if(trSegments.size()==1 && trSegments.get(0).getInterval()[0]==1 && trSegments.get(0).getInterval()[1]<0){
@@ -332,7 +333,7 @@ public class Frechet2DQueriesDirectoriesIntervalsMBRVar2 {
 
             List<Long>[] lists = SparkLogParser.getTimeFromTwoStagesPerJob(eventLogFile.getAbsolutePath());
             try {
-                SparkLogParser.enrichQueryAdHocFile(metricsPath+ File.separator+"frechet-queries-optimized-intervals-"+Paths.get(parquetPath).getFileName().toString()+"-"+ Paths.get(queriesFilePath).getFileName().toString().replaceFirst("\\.[^.]+$", "")+".txt", lists);
+                SparkLogParser.enrichQueryAdHocFile(fullPathExportedFile, lists);
             }catch (Exception e) {
                 e.printStackTrace();
             }

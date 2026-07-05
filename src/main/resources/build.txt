@@ -1,7 +1,7 @@
 
 
-mvn clean && mvn compile && mvn -Dmaven.test.skip=true package && scp target/Spatial-NoDB-1.0-SNAPSHOT.jar lab:~/Desktop/trajparquet/ &&
-mvn clean && mvn compile && mvn -Dmaven.test.skip=true package && scp target/Spatial-NoDB-1.0-SNAPSHOT.jar ktr:~/ && ssh ktr "scp Spatial-NoDB-1.0-SNAPSHOT.jar node14:~/trajparquet"
+mvn clean && mvn compile && mvn -Dmaven.test.skip=true package && scp target/Frequet-1.0-SNAPSHOT.jar lab:~/Desktop/trajparquet/ &&
+mvn clean && mvn compile && mvn -Dmaven.test.skip=true package && scp target/Frequet-1.0-SNAPSHOT.jar ktr:~/ && ssh ktr "scp Frequet-1.0-SNAPSHOT.jar node14:~/frequet"
 
 
 
