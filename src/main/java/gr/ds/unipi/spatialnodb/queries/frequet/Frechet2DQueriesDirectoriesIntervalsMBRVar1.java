@@ -105,7 +105,7 @@ public class Frechet2DQueriesDirectoriesIntervalsMBRVar1 {
         String fullPathExportedFile = metricsPath+ File.separator+"frechet-queries-mbr-var1-"+Paths.get(parquetPath).getFileName().toString()+"-"+ Paths.get(queriesFilePath).getFileName().toString().replaceFirst("\\.[^.]+$", "")+".txt";
         BufferedWriter bw = new BufferedWriter(new FileWriter(fullPathExportedFile));
         BufferedReader br = new BufferedReader(new FileReader(queriesFilePath));
-        bw.write("Time Exec\tNum of Trajectories\tNum of Points\tIssued\tData Pages\tParse\n");
+        bw.write("Time Exec\tNum of Trajectories\tNum of Points\tIssued\tData Pages\tIntersected Cubes\tParse\n");
         String query;
         while ((query = br.readLine()) != null) {
             long startTime = System.currentTimeMillis();
@@ -217,7 +217,7 @@ public class Frechet2DQueriesDirectoriesIntervalsMBRVar1 {
 
             if(sbIntersected.length()==0 && sbFullyCovers.length()==0){
                 long endTime = System.currentTimeMillis();
-                bw.write((endTime-startTime)+"\t"+0+"\t"+0+"\t"+"false"+"\t"+DataPage.counter+"\t"+parseAndCubeIndex);
+                bw.write((endTime-startTime)+"\t"+0+"\t"+0+"\t"+"false"+"\t"+DataPage.counter+"\t"+0+"\t"+parseAndCubeIndex);
                 DataPage.counter = 0;
                 bw.newLine();
                 continue;
@@ -308,13 +308,8 @@ public class Frechet2DQueriesDirectoriesIntervalsMBRVar1 {
                         trSegments.forEach(e->ts.add(e.getTrajectorySegment()));
 
                         return Collections.singletonList(new Tuple2<Void, TrajectorySegment>(null, new TrajectorySegment(f._1, ts))).iterator();
-                    }).filter(f->{
-                            if(Double.compare(HilbertUtil.frechetDistance(trajectoryQuery, f._2.getSpatialPoints()),epsilon)!=1){
-                                return true;
-                            }else{
-                                return false;
-                            }
-                    });
+                    }).filter(f-> HilbertUtil.frechetDistanceIsLessThanEpsilon(trajectoryQuery, f._2.getSpatialPoints(),epsilon));
+
 
             List<Tuple2<Void,TrajectorySegment>> trajs = results.collect();
             long endTime = System.currentTimeMillis();
@@ -325,7 +320,10 @@ public class Frechet2DQueriesDirectoriesIntervalsMBRVar1 {
                 numOfPoints = numOfPoints + voidTrajectoryTuple2._2.getSpatialPoints().length;
             }
 
-            bw.write((endTime - startTime)+"\t"+num+"\t"+numOfPoints+"\t"+"true"+"\t"+DataPage.counter+"\t"+parseAndCubeIndex);
+            int w = (sbFullyCovers.length() == 0 ? 0 : (int) sbFullyCovers.chars().filter(c -> c == ',').count() + 1);
+            w = w + (sbIntersected.length() == 0 ? 0 : (int) sbIntersected.chars().filter(c -> c == ',').count() + 1);
+
+            bw.write((endTime - startTime)+"\t"+num+"\t"+numOfPoints+"\t"+"true"+"\t"+DataPage.counter+"\t"+w+"\t"+parseAndCubeIndex);
             DataPage.counter = 0;
             bw.newLine();
         }

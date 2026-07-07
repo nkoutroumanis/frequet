@@ -10,9 +10,7 @@ import gr.ds.unipi.spatialnodb.messages.common.trajparquet.TrajectorySegment;
 import gr.ds.unipi.spatialnodb.messages.common.trajparquet.TrajectorySegmentWithIntervalMetadata;
 import gr.ds.unipi.spatialnodb.messages.common.trajparquet.TrajectorySegmentWithIntervalMetadataReadSupport;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.fs.FileStatus;
-import org.apache.hadoop.fs.FileSystem;
-import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.*;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.parquet.column.page.DataPage;
 import org.apache.parquet.filter2.predicate.FilterPredicate;
@@ -47,7 +45,7 @@ public class Frechet2DQueriesDirectoriesIntervalsDistancesVar2 {
         final double epsilon = dataLoading.getDouble("epsilon");
 
         Config metadata;
-        if(parquetPath.startsWith("hdfs://")){
+        if (parquetPath.startsWith("hdfs://")) {
             Path filePath = new Path(parquetPath, "space.metadata");
             FileSystem fs = filePath.getFileSystem(new Configuration());
             try (InputStream in = fs.open(filePath)) {
@@ -55,8 +53,8 @@ public class Frechet2DQueriesDirectoriesIntervalsDistancesVar2 {
                         new InputStreamReader(in)
                 ).resolve().getConfig("gridHilbert");
             }
-        }else{
-            metadata = ConfigFactory.parseFile(new File(parquetPath+ File.separator+"space.metadata")).resolve().getConfig("gridHilbert");
+        } else {
+            metadata = ConfigFactory.parseFile(new File(parquetPath + File.separator + "space.metadata")).resolve().getConfig("gridHilbert");
         }
         final int bits = metadata.getInt("bits");
         Config boundaries = metadata.getConfig("boundaries");
@@ -71,19 +69,21 @@ public class Frechet2DQueriesDirectoriesIntervalsDistancesVar2 {
         final IndexUtils indexUtils = new IndexUtils(minLon, minLat, maxLon, maxLat, maxOrdinates);
 
         Job job = Job.getInstance();
+//        ParquetInputFormat.setTaskSideMetaData(job, true);
+//        System.out.println(job.getConfiguration().get("parquet.task.side.metadata"));
 
         ParquetInputFormat.setReadSupportClass(job, TrajectorySegmentWithIntervalMetadataReadSupport.class);
 
         SparkConf sparkConf = new SparkConf();//.registerKryoClasses(new Class[]{SpatioTemporalPoint.class,SpatioTemporalPoint[].class});/*.setMaster("local[1]").set("spark.executor.memory","1g")*/
         sparkConf.setAppName("Similarity Querying in TrajParquet");
         if (!sparkConf.contains("spark.master")) {
-            sparkConf.setMaster("local[*]").set("spark.executor.memory","4g");
+            sparkConf.setMaster("local[*]").set("spark.executor.memory", "4g");
         }
         SparkSession sparkSession = SparkSession.builder().config(sparkConf).getOrCreate();
         JavaSparkContext jsc = JavaSparkContext.fromSparkContext(sparkSession.sparkContext());
 
         Set<String> directoriesSet = new HashSet<>();
-        if(parquetPath.startsWith("hdfs://")){
+        if (parquetPath.startsWith("hdfs://")) {
             Path stIndexPath = new Path(parquetPath + "/stIndex");
             FileSystem fs = stIndexPath.getFileSystem(job.getConfiguration());
             FileStatus[] statuses = fs.listStatus(stIndexPath);
@@ -93,17 +93,128 @@ public class Frechet2DQueriesDirectoriesIntervalsDistancesVar2 {
                     directoriesSet.add(status.getPath().getName());
                 }
             }
-        }else{
-            File[] directories = new File(parquetPath+ File.separator+"stIndex").listFiles(File::isDirectory);
+        } else {
+            File[] directories = new File(parquetPath + File.separator + "stIndex").listFiles(File::isDirectory);
             for (File directory : directories) {
                 directoriesSet.add(directory.getName());
             }
         }
 
+//        for (int k = 0; k < 3; k++) {
+//            long startTime = System.currentTimeMillis();
+//
+//            Path dirPath = new Path(parquetPath + "/stIndex");
+//            FileSystem fs = dirPath.getFileSystem(job.getConfiguration());
+//        System.out.println(">>> Starting Driver-side Deep Metadata Simulation...");
+//
+//        long totalFilesFound = 0;
+//        long totalBlocksEvaluated = 0;
+//        long totalReplicaNodesParsed = 0;
+//
+//        // 2. Deep recursive iteration (This is what newAPIHadoopFile executes)
+//
+//            System.out.println("Processing directory: " + dirPath.getName());
+//
+//            RemoteIterator<LocatedFileStatus> fileIterator = fs.listFiles(dirPath, true);
+//
+//            while (fileIterator.hasNext()) {
+//                LocatedFileStatus fileStatus = fileIterator.next();
+//                totalFilesFound++;
+//
+//                // Fetch the block location array for the file
+//                BlockLocation[] blocks = fileStatus.getBlockLocations();
+//
+//                for (BlockLocation block : blocks) {
+//                    totalBlocksEvaluated++;
+//
+//                    // CRITICAL STEP: Extract the array of physical DataNodes hosting this block
+//                    // This mimics Spark's Driver unpacking network packets to find data locality
+//                    String[] hosts = block.getHosts();
+//
+//                    for (String host : hosts) {
+//                        totalReplicaNodesParsed++;
+//
+//                        // Prevent JIT compiler from optimizing away this loop
+//                        if (host == null || host.isEmpty()) {
+//                            System.out.print("");
+//                        }
+//                    }
+//                }
+//            }
+//
+//
+//        long endTime = System.currentTimeMillis();
+//        double durationSeconds = (endTime - startTime) / 1000.0;
+//
+//        // 3. Print the True Overhead Metrics
+//            System.out.println("\n=================================================");
+//            System.out.println("EXACT DRIVER OVERHEAD METRICS:");
+//            System.out.println("=================================================");
+//            System.out.println("Total Individual Files:          " + totalFilesFound);
+//            System.out.println("Total HDFS Blocks Processed:     " + totalBlocksEvaluated);
+//            System.out.println("Total Node Hostnames Evaluated:  " + totalReplicaNodesParsed);
+//            System.out.println("Total Driver Execution Time:     " + durationSeconds + " seconds");
+//            System.out.println("=================================================");
+//
+//            String taskSideMeta = job.getConfiguration().get("parquet.task.side.metadata");
+//
+//            System.out.println("=====================================================");
+//            System.out.println("CURRENT VALUE OF parquet.task.side.metadata: " + taskSideMeta);
+//            System.out.println("=====================================================");
+//
+//        }
+//        System.exit(7);
+
+//        String targetPath = parquetPath + "/stIndex";
+//        job.getConfiguration().set("mapreduce.input.fileinputformat.inputdir", targetPath);
+//        job.getConfiguration().set("mapred.input.dir", targetPath);
+//
+//        job.getConfiguration().set("mapreduce.input.fileinputformat.list-status.num-threads", "36");
+//        job.getConfiguration().set("parquet.task.side.metadata", "true");
+//        FileInputFormat.setInputPaths(new JobConf(job.getConfiguration()), new Path(targetPath));
+//        System.out.println("=== STARTING ARCHITECTURAL BOTTLENECK SIMULATION ===");
+//        System.out.println("Target Path: " + targetPath);
+//        System.out.println("---------------------------------------------------\n");
+//        ParquetInputFormat<Object> inputFormat = new ParquetInputFormat<>();
+//        // --- PHASE 1 & 2: NameNode RPC Crawl & Object Generation ---
+//        System.out.println("[Executing] Querying NameNode & Generating File Splits...");
+//        long phase1Start = System.currentTimeMillis();
+//
+//        // This is the exact method Spark hangs on before Stage 4
+//        List<?> splits = inputFormat.getSplits(job);
+//
+//        long phase1Time = System.currentTimeMillis() - phase1Start;
+//        System.out.println("--> [Success] Generated " + splits.size() + " individual InputSplits.");
+//        System.out.println("--> Phase 1 & 2 Duration: " + phase1Time + " ms (" + (phase1Time / 1000.0) + " seconds)\n");
+//
+//        // --- PHASE 3 & 5: Task Serialization Simulation ---
+//        System.out.println("[Executing] Simulating Driver Task Serialization...");
+//        long phase2Start = System.currentTimeMillis();
+//
+//        // Force the JVM to serialize the metadata array, exactly like shipping tasks to executors
+//        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+//        ObjectOutputStream oos = new ObjectOutputStream(baos);
+//        oos.writeObject(splits);
+//        oos.close();
+//
+//        long phase2Time = System.currentTimeMillis() - phase2Start;
+//        double payloadSizeMb = baos.size() / (1024.0 * 1024.0);
+//        System.out.println("--> [Success] Serialized Task Payload Size: " + String.format("%.2f", payloadSizeMb) + " MB");
+//        System.out.println("--> Phase 3 & 5 Duration: " + phase2Time + " ms (" + (phase2Time / 1000.0) + " seconds)\n");
+//
+//        // --- TOTAL RESULTS ---
+//        long totalDuration = phase1Time + phase2Time;
+//        System.out.println("===================================================");
+//        System.out.println("TOTAL PRE-STAGE 4 SIMULATION TIME: " + (totalDuration / 1000.0) + " seconds");
+//        System.out.println("===================================================");
+//
+//        System.exit(7);
+
+
         String fullPathExportedFile = metricsPath+ File.separator+"frechet-queries-distances-var2-"+Paths.get(parquetPath).getFileName().toString()+"-"+ Paths.get(queriesFilePath).getFileName().toString().replaceFirst("\\.[^.]+$", "")+".txt";
         BufferedWriter bw = new BufferedWriter(new FileWriter(fullPathExportedFile));
         BufferedReader br = new BufferedReader(new FileReader(queriesFilePath));
-        bw.write("Time Exec\tNum of Trajectories\tNum of Points\tIssued\tData Pages\tParse\n");
+        bw.write("Time Exec\tNum of Trajectories\tNum of Points\tIssued\tData Pages\tIntersected Cubes\tParse\n");
         String query;
         while ((query = br.readLine()) != null) {
             long startTime = System.currentTimeMillis();
@@ -198,39 +309,40 @@ public class Frechet2DQueriesDirectoriesIntervalsDistancesVar2 {
                     }
                 }
 
-//            FilterPredicate xAxis = and(gtEq(doubleColumn("maxLongitude"), trajectoryQuery[0].getLongitude()-epsilon), ltEq(doubleColumn("minLongitude"), trajectoryQuery[0].getLongitude()+epsilon));
-//            FilterPredicate yAxis = and(gtEq(doubleColumn("maxLatitude"), trajectoryQuery[0].getLatitude()-epsilon), ltEq(doubleColumn("minLatitude"), trajectoryQuery[0].getLatitude()+epsilon));
-//            FilterPredicate fp = and(xAxis, yAxis);
-//
-//            for (int i = 1; i < trajectoryQuery.length; i++) {
-//                xAxis = and(gtEq(doubleColumn("maxLongitude"), trajectoryQuery[i].getLongitude()-epsilon), ltEq(doubleColumn("minLongitude"), trajectoryQuery[i].getLongitude()+epsilon));
-//                yAxis = and(gtEq(doubleColumn("maxLatitude"), trajectoryQuery[i].getLatitude()-epsilon), ltEq(doubleColumn("minLatitude"), trajectoryQuery[i].getLatitude()+epsilon));
-//                fp = or(fp, and(xAxis, yAxis));
-//            }
-
-            FilterPredicate xAxis = and(gtEq(doubleColumn("minLongitude"), trajectoryQuery[0].getLongitude()-epsilon), ltEq(doubleColumn("maxLongitude"), trajectoryQuery[0].getLongitude()+epsilon));
-            FilterPredicate yAxis = and(gtEq(doubleColumn("minLatitude"), trajectoryQuery[0].getLatitude()-epsilon), ltEq(doubleColumn("maxLatitude"), trajectoryQuery[0].getLatitude()+epsilon));
+            FilterPredicate xAxis = and(gtEq(doubleColumn("maxLongitude"), trajectoryQuery[0].getLongitude()-epsilon), ltEq(doubleColumn("minLongitude"), trajectoryQuery[0].getLongitude()+epsilon));
+            FilterPredicate yAxis = and(gtEq(doubleColumn("maxLatitude"), trajectoryQuery[0].getLatitude()-epsilon), ltEq(doubleColumn("minLatitude"), trajectoryQuery[0].getLatitude()+epsilon));
             FilterPredicate fp = and(xAxis, yAxis);
 
             for (int i = 1; i < trajectoryQuery.length; i++) {
-                xAxis = and(gtEq(doubleColumn("minLongitude"), trajectoryQuery[i].getLongitude()-epsilon), ltEq(doubleColumn("maxLongitude"), trajectoryQuery[i].getLongitude()+epsilon));
-                yAxis = and(gtEq(doubleColumn("minLatitude"), trajectoryQuery[i].getLatitude()-epsilon), ltEq(doubleColumn("maxLatitude"), trajectoryQuery[i].getLatitude()+epsilon));
+                xAxis = and(gtEq(doubleColumn("maxLongitude"), trajectoryQuery[i].getLongitude()-epsilon), ltEq(doubleColumn("minLongitude"), trajectoryQuery[i].getLongitude()+epsilon));
+                yAxis = and(gtEq(doubleColumn("maxLatitude"), trajectoryQuery[i].getLatitude()-epsilon), ltEq(doubleColumn("minLatitude"), trajectoryQuery[i].getLatitude()+epsilon));
                 fp = or(fp, and(xAxis, yAxis));
             }
+
+//            FilterPredicate xAxis = and(gtEq(doubleColumn("minLongitude"), trajectoryQuery[0].getLongitude()-epsilon), ltEq(doubleColumn("maxLongitude"), trajectoryQuery[0].getLongitude()+epsilon));
+//            FilterPredicate yAxis = and(gtEq(doubleColumn("minLatitude"), trajectoryQuery[0].getLatitude()-epsilon), ltEq(doubleColumn("maxLatitude"), trajectoryQuery[0].getLatitude()+epsilon));
+//            FilterPredicate fp = and(xAxis, yAxis);
+//
+//            for (int i = 1; i < trajectoryQuery.length; i++) {
+//                xAxis = and(gtEq(doubleColumn("minLongitude"), trajectoryQuery[i].getLongitude()-epsilon), ltEq(doubleColumn("maxLongitude"), trajectoryQuery[i].getLongitude()+epsilon));
+//                yAxis = and(gtEq(doubleColumn("minLatitude"), trajectoryQuery[i].getLatitude()-epsilon), ltEq(doubleColumn("maxLatitude"), trajectoryQuery[i].getLatitude()+epsilon));
+//                fp = or(fp, and(xAxis, yAxis));
+//            }
             ParquetInputFormat.setFilterPredicate(job.getConfiguration(), fp);
 
             long parseAndCubeIndex = System.currentTimeMillis() - startTime;
 
             if(sb.length()==0){
                 long endTime = System.currentTimeMillis();
-                bw.write((endTime-startTime)+"\t"+0+"\t"+0+"\t"+"false"+"\t"+DataPage.counter+"\t"+parseAndCubeIndex);
+                bw.write((endTime-startTime)+"\t"+0+"\t"+0+"\t"+"false"+"\t"+DataPage.counter+"\t"+0+"\t"+parseAndCubeIndex);
                 DataPage.counter = 0;
                 bw.newLine();
                 continue;
             }
 
             sb.deleteCharAt(sb.length()-1);
-            JavaPairRDD<Void, TrajectorySegmentWithIntervalMetadata> pairRDDRangeQuery = (JavaPairRDD<Void, TrajectorySegmentWithIntervalMetadata>) jsc.newAPIHadoopFile(sb.toString(), ParquetInputFormat.class, Void.class, TrajectorySegmentWithIntervalMetadata.class, job.getConfiguration());
+//            job.getConfiguration().set("mapreduce.input.fileinputformat.split.maxsize", "134217728");
+            JavaPairRDD<Void, TrajectorySegmentWithIntervalMetadata> pairRDDRangeQuery = (JavaPairRDD<Void, TrajectorySegmentWithIntervalMetadata>) jsc.newAPIHadoopFile(sb.toString()/*parquetPath+ File.separator+"stIndex"+File.separator*/, ParquetInputFormat.class, Void.class, TrajectorySegmentWithIntervalMetadata.class, job.getConfiguration());
 
 
             pairRDDRangeQuery = pairRDDRangeQuery.filter(f -> {
@@ -294,13 +406,7 @@ public class Frechet2DQueriesDirectoriesIntervalsDistancesVar2 {
                         trSegments.forEach(e->ts.add(e.getTrajectorySegment()));
 
                         return Collections.singletonList(new Tuple2<Void, TrajectorySegment>(null, new TrajectorySegment(f._1, ts))).iterator();
-                    }).filter(f->{
-                            if(Double.compare(HilbertUtil.frechetDistance(trajectoryQuery, f._2.getSpatialPoints()),epsilon)!=1){
-                                return true;
-                            }else{
-                                return false;
-                            }
-                    });
+                    }).filter(f-> HilbertUtil.frechetDistanceIsLessThanEpsilon(trajectoryQuery, f._2.getSpatialPoints(),epsilon));
 
             List<Tuple2<Void,TrajectorySegment>> trajs = results.collect();
             long endTime = System.currentTimeMillis();
@@ -310,8 +416,9 @@ public class Frechet2DQueriesDirectoriesIntervalsDistancesVar2 {
             for (Tuple2<Void, TrajectorySegment> voidTrajectoryTuple2 : trajs) {
                 numOfPoints = numOfPoints + voidTrajectoryTuple2._2.getSpatialPoints().length;
             }
+            int w = (sb.length() == 0 ? 0 : (int) sb.chars().filter(c -> c == ',').count() + 1);
 
-            bw.write((endTime - startTime)+"\t"+num+"\t"+numOfPoints+"\t"+"true"+"\t"+DataPage.counter+"\t"+parseAndCubeIndex);
+            bw.write((endTime - startTime)+"\t"+num+"\t"+numOfPoints+"\t"+"true"+"\t"+DataPage.counter+"\t"+w+"\t"+parseAndCubeIndex);
             DataPage.counter = 0;
             bw.newLine();
         }

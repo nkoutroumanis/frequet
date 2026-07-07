@@ -333,6 +333,11 @@ public class HilbertUtil {
         return (Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2)));
     }
 
+    public static boolean isEuclideanDistanceEqualOrLowerThan(double x1, double y1, double x2, double y2, double epsilon) {
+        if (epsilon < 0) return false;
+        return Double.compare(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2), epsilon*epsilon)!=1 ;
+    }
+
     public static double frechetDistance(SpatialPoint[] sp1, SpatialPoint[] sp2) {
 
             if(sp1.length > sp2.length){
@@ -358,6 +363,44 @@ public class HilbertUtil {
                 }
             }
             return arr[sp1.length-1];
+    }
+
+    public static boolean frechetDistanceIsLessThanEpsilon(SpatialPoint[] sp1, SpatialPoint[] sp2, double epsilon) {
+
+        if(sp1.length > sp2.length){
+            return frechetDistanceIsLessThanEpsilon(sp2, sp1, epsilon);
+        }
+
+        boolean[] arr = new boolean[sp1.length];
+        arr[0] = HilbertUtil.isEuclideanDistanceEqualOrLowerThan(sp1[0].getLongitude(), sp1[0].getLatitude(), sp2[0].getLongitude(), sp2[0].getLatitude(),epsilon);
+        boolean hasTrue = arr[0];
+
+        for (int i = 1; i < sp1.length; i++) {
+            arr[i] = arr[i-1] && HilbertUtil.isEuclideanDistanceEqualOrLowerThan(sp1[i].getLongitude(), sp1[i].getLatitude(), sp2[0].getLongitude(), sp2[0].getLatitude(),epsilon);
+            hasTrue |= arr[i];
+        }
+
+//        if (arr[sp1.length - 1]) {return true;}
+        if (!hasTrue) return false;
+
+        boolean diagonal;
+        boolean value;
+        for (int j = 1; j < sp2.length; j++) {
+            diagonal = arr[0];
+            arr[0] = diagonal && HilbertUtil.isEuclideanDistanceEqualOrLowerThan(sp1[0].getLongitude(), sp1[0].getLatitude(), sp2[j].getLongitude(), sp2[j].getLatitude(),epsilon);
+            hasTrue = arr[0];
+
+            for (int i = 1; i < sp1.length; i++) {
+                value =  (arr[i-1] || arr[i] || diagonal)  && HilbertUtil.isEuclideanDistanceEqualOrLowerThan(sp1[i].getLongitude(), sp1[i].getLatitude(), sp2[j].getLongitude(), sp2[j].getLatitude(),epsilon);
+                diagonal = arr[i];
+                arr[i] = value;
+                hasTrue |= arr[i];
+            }
+//            if (arr[sp1.length - 1]) {return true;}
+            if (!hasTrue) return false; // early termination
+
+        }
+        return arr[sp1.length-1];
     }
 
     //assumes that the segment does not intersect with rectangle
