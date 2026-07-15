@@ -7,7 +7,10 @@ import com.typesafe.config.ConfigValueFactory;
 import gr.ds.unipi.spatialnodb.dataloading.HilbertUtil;
 import gr.ds.unipi.spatialnodb.hadoop.MultipleParquetOutputsFormat;
 import gr.ds.unipi.spatialnodb.messages.common.*;
-import gr.ds.unipi.spatialnodb.messages.common.trajparquet.*;
+import gr.ds.unipi.spatialnodb.messages.common.trajparquet.TrajectorySegment;
+import gr.ds.unipi.spatialnodb.messages.common.trajparquet.TrajectorySegmentWithMetadata;
+import gr.ds.unipi.spatialnodb.messages.common.trajparquet.TrajectorySegmentWithMetadataWriteSupport;
+import gr.ds.unipi.spatialnodb.messages.common.trajparquet.TrajectorySegmentWriteSupport;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -31,15 +34,18 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.*;
-import java.nio.file.attribute.BasicFileAttributes;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.text.SimpleDateFormat;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
 import java.util.stream.Stream;
 
 import static gr.ds.unipi.spatialnodb.AppConfig.loadConfig;
 
-public class DataLoadingDirectoriesWithWholeTrajectories {
+public class DataLoadingWithWholeTrajectories {
     public static void main(String[] args) throws IOException {
 
         Config config = loadConfig("data-loading.conf");
@@ -319,160 +325,13 @@ public class DataLoadingDirectoriesWithWholeTrajectories {
             Tuple2<Long, TrajectorySegmentWithMetadata> newTrjSeg = new Tuple2<>(trjSeg._1, TrajectorySegmentWithMetadata.newTrajectorySegmentWithMetadata(new TrajectorySegment(trjSeg._2.getTrajectorySegment().getObjectId(), trjSeg._2.getTrajectorySegment().getSpatialPoints(), trjSeg._2.getTrajectorySegment().getMinLongitude(), trjSeg._2.getTrajectorySegment().getMinLatitude(), trjSeg._2.getTrajectorySegment().getMaxLongitude(), trjSeg._2.getTrajectorySegment().getMaxLatitude()), pivots.toArray(new SpatialPoint[0]), new long[]{trjSeg._2.getInterval()[0], trjSeg._2.getInterval()[1]*(-1)}));
             trajectoryParts.set(trajectoryParts.size()-1, newTrjSeg);
 
-
-//            if(trajectoryParts.size()==7){
-//            TrajectorySegment t = trajectoryParts.get(6)._2.getTrajectorySegment();
-//            if(t.getSegment()==-7 && t.getSpatioTemporalPoints().length==4){
-//                System.out.println(Arrays.toString(t.getSpatioTemporalPoints()));
-//                System.out.println("mbr: "+ t.getMinLongitude()+" "+ t.getMinLatitude()+" "+t.getMinTimestamp()+ " - "+t.getMaxLongitude()+" "+ t.getMaxLatitude()+" "+t.getMaxTimestamp());
-//                System.exit(1);
-//            }}
-
-//            if(trajectoryParts.get(trajectoryParts.size()-1)._2.getTrajectorySegment().getSegment()<-1 && trajectoryParts.get(trajectoryParts.size()-1)._2.getPivots().length>3){
-//                System.out.println(Arrays.toString(trajectoryParts.get(trajectoryParts.size()-1)._2.getTrajectorySegment().getSpatioTemporalPoints()));
-//                System.out.println("pivots: "+ Arrays.toString(trajectoryParts.get(trajectoryParts.size()-1)._2.getPivots()));
-//                System.exit(1);
-//            }
-
-
-//            if(intervalEnd-1!=spts.length){
-//                System.exit(1);
-//            }
-//            for (Tuple2<Long, TrajectorySegmentWithMetadata> trajectoryPart : trajectoryParts) {
-//                if(trajectoryPart._2.getTrajectorySegment().getSegment()>1){
-//                    if(trajectoryPart._2.getTrajectorySegment().getSpatioTemporalPoints().length>2){
-//                        if(!(trajectoryPart._2.getInterval()[1]- trajectoryPart._2.getInterval()[0]+1==trajectoryPart._2.getTrajectorySegment().getSpatioTemporalPoints().length-2)){
-//                            System.exit(1);
-//                        }
-//                    }else{
-//                        if(trajectoryPart._2.getInterval()!=null){
-//                            System.exit(1);
-//                        }
-//                    }
-//                }
-//            }
-//            long y = trajectoryParts.get(0)._2.getInterval()[1];
-//            for (int i = 1; i < trajectoryParts.size(); i++) {
-//                if(trajectoryParts.get(i)._2.getTrajectorySegment().getSpatioTemporalPoints().length>2){
-//                    if(y+1 != trajectoryParts.get(i)._2.getInterval()[0])
-//                    {
-//                        System.out.println(y+" "+trajectoryParts.get(i)._2.getInterval()[0]);
-//                        System.exit(1);
-//                    }
-//                    y=trajectoryParts.get(i)._2.getInterval()[1];
-//                }
-//            }
-//
-//            for (int i = 1; i < trajectoryParts.size()-1; i++) {
-//                if(trajectoryParts.get(i)._2.getTrajectorySegment().getSpatioTemporalPoints().length==2 && trajectoryParts.get(i)._2.getInterval()!=null){
-//                    System.exit(1);
-//                }
-//            }
-//
-////            if(trajectoryParts.get(0)._2.getTrajectorySegment().getSegment()==-1){
-////                System.out.println(trajectoryParts.get(0)._2.getTrajectorySegment());
-////                System.out.println(Arrays.toString(trajectoryParts.get(0)._2.getInterval()));
-////                System.exit(1);
-////            }
-//            for (Tuple2<Long, TrajectorySegmentWithMetadata> trajectoryPart : trajectoryParts) {
-//                if(trajectoryPart._2.getPivots()==null && trajectoryPart._2.getInterval()!=null){
-//                    System.exit(1);
-//                }
-//                if(trajectoryPart._2.getPivots()!=null && trajectoryPart._2.getInterval()==null){
-//                    System.exit(1);
-//                }
-//            }
-
-//            if(Double.compare(trajectoryParts.get(0)._2.getTrajectorySegment().getSpatialPoints()[0].getLongitude(),-0.162165)==0 && Double.compare(trajectoryParts.get(0)._2.getTrajectorySegment().getSpatialPoints()[0].getLatitude(),49.576332)==0){
-//                for (int i = 0; i < trajectoryParts.size(); i++) {
-//                        System.out.println(trajectoryParts.get(i)._1+" - "+ trajectoryParts.get(i)._2.toString());
-//                }
-//                System.exit(5);
-//            }
-
             return trajectoryParts.iterator();
 
-        }).mapToPair((t)->{return Tuple2.apply(new HilbertKeyLongitude(t._1, t._2.getTrajectorySegment().getMinLongitude()),t._2);}).repartitionAndSortWithinPartitions(new HilbertKeyPartitioner(Integer.parseInt(args[0]))).mapToPair(f->Tuple2.apply(Tuple2.apply(f._1.getHilbertKey()+"/", null), f._2));
-        segmentedTrajectoriesRDD.saveAsNewAPIHadoopFile(writePath+File.separator+"stIndex", Void.class, TrajectorySegmentWithMetadata.class, MultipleParquetOutputsFormat.class, job.getConfiguration());
+        }).mapToPair((t)->{return Tuple2.apply(new HilbertKeyLongitude(t._1, t._2.getTrajectorySegment().getMinLongitude()),t._2);}).sortByKey().mapToPair(f->Tuple2.apply(null, f._2));
+        segmentedTrajectoriesRDD.saveAsNewAPIHadoopFile(writePath+File.separator+"stIndex", Void.class, TrajectorySegmentWithMetadata.class, ParquetOutputFormat.class, job.getConfiguration());
 
         long endTime = System.currentTimeMillis();
         System.out.println("Exec Time: "+(endTime-startTime));
-
-        Tuple2<Long, Long> stats = ((JavaPairRDD<Tuple2<String, Object>,TrajectorySegmentWithMetadata>)segmentedTrajectoriesRDD).mapToPair(f->{return Tuple2.apply(f._2.getTrajectorySegment().getObjectId(), f._1._1);}).groupByKey().mapValues(f->{
-            HashSet<String> set = new HashSet<>();
-            for (String s : f) {
-                set.add(s);
-            }
-            return set.size();
-        }).values().aggregate(
-                new Tuple2<>(0L, 0L),
-                (acc, v) -> new Tuple2<>(acc._1 + v, acc._2 + 1),
-                (a, b) -> new Tuple2<>(a._1 + b._1, a._2 + b._2)
-        );
-
-        Tuple2<Integer, Integer> stats1 = ((JavaPairRDD<Tuple2<String, Object>,TrajectorySegmentWithMetadata>)segmentedTrajectoriesRDD).mapToPair(f->{return Tuple2.apply(f._2.getTrajectorySegment().getObjectId(), f._2.getTrajectorySegment().getSpatialPoints().length);}).values().aggregate(
-                new Tuple2<>(0, 0),
-                (acc, v) -> new Tuple2<>(acc._1 + v, acc._2 + 1),
-                (a, b) -> new Tuple2<>(a._1 + b._1, a._2 + b._2)
-        );
-
-        long uniqueCells = ((JavaPairRDD<Tuple2<String, Object>,TrajectorySegmentWithMetadata>)segmentedTrajectoriesRDD).map(f -> f._1._1).distinct().count();
-
-        long totalParquetFiles = 0;
-
-        if (writePath.startsWith("hdfs://")) {
-            Path stIndexPath = new Path(writePath + "/stIndex");
-            FileSystem fs = stIndexPath.getFileSystem(job.getConfiguration());
-            org.apache.hadoop.fs.RemoteIterator<org.apache.hadoop.fs.LocatedFileStatus> files = fs.listFiles(stIndexPath, true);
-            while (files.hasNext()) {
-                if (files.next().getPath().getName().endsWith(".parquet")) {
-                    totalParquetFiles++;
-                }
-            }
-        } else {
-            java.nio.file.Path root = java.nio.file.Paths.get(writePath+ "/stIndex");
-            try (Stream<java.nio.file.Path> paths = Files.walk(root)) {
-                totalParquetFiles = paths.filter(Files::isRegularFile).filter(path -> path.toString().toLowerCase().endsWith(".parquet")).count();
-            }
-        }
-
-        Config metadataFile = ConfigFactory.empty()
-                .withValue("gridHilbert.bits", ConfigValueFactory.fromAnyRef(bits))
-                .withValue("gridHilbert.boundaries.minLon", ConfigValueFactory.fromAnyRef(minLon))
-                .withValue("gridHilbert.boundaries.minLat", ConfigValueFactory.fromAnyRef(minLat))
-                .withValue("gridHilbert.boundaries.maxLon", ConfigValueFactory.fromAnyRef(maxLon))
-                .withValue("gridHilbert.boundaries.maxLat", ConfigValueFactory.fromAnyRef(maxLat))
-                .withValue("gridHilbert.stats.averageIntersectedCellsPerTrajectory", ConfigValueFactory.fromAnyRef((double) stats._1 / stats._2))
-                .withValue("gridHilbert.stats.totalNumberOfPoints", ConfigValueFactory.fromAnyRef(stats1._1))
-                .withValue("gridHilbert.stats.totalNumberOfTracklets", ConfigValueFactory.fromAnyRef(stats1._2))
-                .withValue("gridHilbert.stats.averageNumberOfPointsPerTracklet", ConfigValueFactory.fromAnyRef((double) stats1._1/ stats1._2))
-                .withValue("gridHilbert.stats.numOfTrajectories", ConfigValueFactory.fromAnyRef(stats._2))
-                .withValue("gridHilbert.stats.averageNumberOfPointsPerCell", ConfigValueFactory.fromAnyRef((double) stats1._1/uniqueCells))
-                .withValue("gridHilbert.stats.averageNumberOfTrackletsPerCell", ConfigValueFactory.fromAnyRef((double) stats1._2/uniqueCells))
-                .withValue("gridHilbert.stats.numberOfActiveCells", ConfigValueFactory.fromAnyRef(uniqueCells))
-                .withValue("gridHilbert.stats.numberOfEmptyCells", ConfigValueFactory.fromAnyRef((long)Math.pow(2,bits*2)-uniqueCells))
-                .withValue("gridHilbert.stats.numberOfPointsPerTrajectory", ConfigValueFactory.fromAnyRef((double)stats1._1/stats._2))
-                .withValue("gridHilbert.stats.numberOfParquetFiles", ConfigValueFactory.fromAnyRef(totalParquetFiles));
-
-        String json = metadataFile.root().render(
-                ConfigRenderOptions.defaults()
-                        .setJson(false)
-                        .setFormatted(true).setComments(false).setOriginComments(false)
-
-        );
-
-        if(writePath.startsWith("hdfs://")){
-            FileSystem fs = FileSystem.get(job.getConfiguration());
-            try (FSDataOutputStream out = fs.create(new Path(writePath+"/"+"space.metadata"), true)) {
-                out.write(json.getBytes(StandardCharsets.UTF_8));
-            }
-        }else{
-            try (FileWriter fw = new FileWriter(writePath+ File.separator+"space.metadata")) {
-                fw.write(json);
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
 
         try(BufferedWriter bf = new BufferedWriter(new FileWriter(metricsPathExport+File.separator+"data-loading-trajparquetDirectoriesWithWholeTrajectories-"+Paths.get(writePath).getFileName().toString()+".txt"))) {
             bf.write("Write Time");

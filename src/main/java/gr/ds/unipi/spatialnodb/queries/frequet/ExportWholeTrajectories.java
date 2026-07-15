@@ -20,7 +20,7 @@ import static gr.ds.unipi.spatialnodb.AppConfig.loadConfig;
 
 public class ExportWholeTrajectories {
     public static void main(String[] args) {
-        Config config = loadConfig("export-trajectories.conf");
+        Config config = loadConfig("export-trajectories-worldtrace.conf");
 
         Config dataLoading = config.getConfig("export-trajectories");
         final String rawDataPath = dataLoading.getString("rawDataPath");
@@ -43,7 +43,28 @@ public class ExportWholeTrajectories {
         SparkSession sparkSession = SparkSession.builder().config(sparkConf).getOrCreate();
         JavaSparkContext jsc = JavaSparkContext.fromSparkContext(sparkSession.sparkContext());
 
-        List<List<Tuple3<Double, Double, Long>>> trajectories = jsc.textFile(rawDataPath).map(f->f.split(delimiter)).groupBy(f-> f[objectIdIndex]).map(f->{
+        List<List<Tuple3<Double, Double, Long>>> trajectories = jsc.textFile(rawDataPath).map(f->f.split(delimiter))
+                .filter(fields -> {
+                    try {
+                        Double.parseDouble(fields[latitudeIndex]);
+                        Double.parseDouble(fields[longitudeIndex]);
+                        sdf.parse(fields[timeIndex]);
+                        return true;
+                    } catch (Exception e) {
+                        return false;
+                    }
+                })
+                .filter(fields -> {
+                    try {
+                        Double.parseDouble(fields[latitudeIndex]);
+                        Double.parseDouble(fields[longitudeIndex]);
+                        sdf.parse(fields[timeIndex]);
+                        return true;
+                    } catch (Exception e) {
+                        return false;
+                    }
+                })
+                .groupBy(f-> f[objectIdIndex]).map(f->{
             List<Tuple3<Double, Double, Long>> tuple = new ArrayList<>();
             for (String[] strings : f._2) {
                 long timestamp = -1;
@@ -61,7 +82,7 @@ public class ExportWholeTrajectories {
             tuple.sort(comp);
 
             return tuple;
-        })/*.filter(f->f.size()<=200)*/.takeSample(false, n);
+        }).filter(f-> f.size() != 1).filter(f->f.size()<=200).takeSample(false, n);
 
 
         try (BufferedWriter writer = new BufferedWriter(new FileWriter(writePath))) {

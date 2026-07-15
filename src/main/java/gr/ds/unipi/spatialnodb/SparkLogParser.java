@@ -25,14 +25,14 @@ public class SparkLogParser {
         BufferedWriter bw = new BufferedWriter(new FileWriter(path.replaceAll("\\.[^.]+$", ".tmp")));
         BufferedReader br = new BufferedReader(new FileReader(path));
         line = br.readLine();
-        bw.write(line+"\tStage1\tStage2\n");
+        bw.write(line+"\tStage1\tStage2\tShuffled Remote Bytes\n");
         int i = 0;
         while ((line = br.readLine()) != null) {
             if(line.contains("false")){
-                bw.write(line+"\t0\t0");
+                bw.write(line+"\t0\t0\t0\n");
                 bw.newLine();
             }else if(line.contains("true")){
-                bw.write(line+"\t"+stages[0].get(i)+"\t"+stages[1].get(i));
+                bw.write(line+"\t"+stages[0].get(i)+"\t"+stages[1].get(i)+"\t"+stages[2].get(i));
                 bw.newLine();
                 i++;
             }else{
@@ -80,14 +80,13 @@ public class SparkLogParser {
             List<Long> times = new ArrayList<>();
             List<Long> stage1;
             List<Long> stage2;
-
+            List<Long> shuffled = new ArrayList<>();
             BufferedReader br = new BufferedReader(new FileReader(filePath));
             String line;
             long submissionTime = 0;
             long completedTime = 0;
-
+            long shuffledBytes = 0;
             while((line = br.readLine())!=null){
-
                 if(line.contains("\"SparkListenerStageCompleted\"")){
                     int index = line.indexOf("\"Submission Time\":");
                     String line1 = line.substring(index);
@@ -99,9 +98,21 @@ public class SparkLogParser {
 
                     times.add((completedTime-submissionTime));
                 }
+
+                if(line.contains("\"SparkListenerJobEnd\"")){
+                    shuffled.add(shuffledBytes);
+                    shuffledBytes = 0;
+                }
+
+                if(line.contains("\"Remote Bytes Read\"")){
+                    int index = line.indexOf("\"Remote Bytes Read\"");
+                    String subline = line.substring(index);
+                    shuffledBytes = shuffledBytes + Long.parseLong(subline.substring(0,subline.indexOf(",")).substring(subline.indexOf(":")+1));
+                }
             }
             stage1 = new ArrayList<>(times.size()/2);
             stage2 = new ArrayList<>(times.size()/2);
+
             for (int i = 0; i < times.size(); i++) {
                 if(i%2==0){
                     stage1.add(times.get(i));
@@ -109,7 +120,7 @@ public class SparkLogParser {
                     stage2.add(times.get(i));
                 }
             }
-            return new List[]{stage1, stage2};
+            return new List[]{stage1, stage2, shuffled};
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
