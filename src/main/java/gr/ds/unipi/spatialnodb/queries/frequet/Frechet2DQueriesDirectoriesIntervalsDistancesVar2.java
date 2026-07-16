@@ -20,6 +20,7 @@ import org.apache.parquet.hadoop.ParquetInputFormat;
 import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaSparkContext;
+import org.apache.spark.broadcast.Broadcast;
 import org.apache.spark.sql.SparkSession;
 import org.davidmoten.hilbert.HilbertCurve;
 import org.davidmoten.hilbert.Range;
@@ -76,13 +77,14 @@ public class Frechet2DQueriesDirectoriesIntervalsDistancesVar2 {
 
         ParquetInputFormat.setReadSupportClass(job, TrajectorySegmentWithIntervalMetadataReadSupport.class);
 
-        SparkConf sparkConf = new SparkConf();//.registerKryoClasses(new Class[]{SpatioTemporalPoint.class,SpatioTemporalPoint[].class});/*.setMaster("local[1]").set("spark.executor.memory","1g")*/
+        SparkConf sparkConf = new SparkConf().registerKryoClasses(new Class[]{SmallHilbertCurve.class});
         sparkConf.setAppName("Similarity Querying in TrajParquet");
         if (!sparkConf.contains("spark.master")) {
             sparkConf.setMaster("local[*]").set("spark.executor.memory", "4g");
         }
         SparkSession sparkSession = SparkSession.builder().config(sparkConf).getOrCreate();
         JavaSparkContext jsc = JavaSparkContext.fromSparkContext(sparkSession.sparkContext());
+        Broadcast<SmallHilbertCurve> smallHilbertCurveBr = jsc.<SmallHilbertCurve>broadcast(hilbertCurve);
 
         Set<String> directoriesSet = new HashSet<>();
         if (parquetPath.startsWith("hdfs://")) {
@@ -418,7 +420,7 @@ public class Frechet2DQueriesDirectoriesIntervalsDistancesVar2 {
                                 for (int j = indexInterval.get(i).getStart()-1; j <= indexInterval.get(i).getEnd()-1; j++) {
                                     boolean r = true;
                                     for (Long trackletsCellId : trackletsCellIds) {
-                                        long[] cube = hilbertCurve.point(trackletsCellId);
+                                        long[] cube = smallHilbertCurveBr.getValue().point(trackletsCellId);
                                         double xMin = minLon + (cube[0] * (maxLon-minLon)/(maxOrdinates+ 1L));
                                         double yMin = minLat + (cube[1] * (maxLat-minLat)/(maxOrdinates+ 1L));
                                         double xMax = minLon + ((cube[0]+1) * (maxLon-minLon)/(maxOrdinates+ 1L));

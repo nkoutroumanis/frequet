@@ -1,6 +1,8 @@
 package gr.ds.unipi.spatialnodb.messages.common.trajparquet;
 
-public class IndexInterval {
+import java.io.Serializable;
+
+public class IndexInterval implements Serializable {
     private int start;
     private int end;
     private IndexInterval(int start, int end) {
