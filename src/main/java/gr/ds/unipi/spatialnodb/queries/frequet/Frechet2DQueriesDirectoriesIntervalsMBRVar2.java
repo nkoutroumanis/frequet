@@ -208,15 +208,6 @@ public class Frechet2DQueriesDirectoriesIntervalsMBRVar2 {
                 fp = or(fp, and(xAxis, yAxis));
             }
 
-//            FilterPredicate xAxis = and(gtEq(doubleColumn("minLongitude"), trajectoryQuery[0].getLongitude()-epsilon), ltEq(doubleColumn("maxLongitude"), trajectoryQuery[0].getLongitude()+epsilon));
-//            FilterPredicate yAxis = and(gtEq(doubleColumn("minLatitude"), trajectoryQuery[0].getLatitude()-epsilon), ltEq(doubleColumn("maxLatitude"), trajectoryQuery[0].getLatitude()+epsilon));
-//            FilterPredicate fp = and(xAxis, yAxis);
-//
-//            for (int i = 1; i < trajectoryQuery.length; i++) {
-//                xAxis = and(gtEq(doubleColumn("minLongitude"), trajectoryQuery[i].getLongitude()-epsilon), ltEq(doubleColumn("maxLongitude"), trajectoryQuery[i].getLongitude()+epsilon));
-//                yAxis = and(gtEq(doubleColumn("minLatitude"), trajectoryQuery[i].getLatitude()-epsilon), ltEq(doubleColumn("maxLatitude"), trajectoryQuery[i].getLatitude()+epsilon));
-//                fp = or(fp, and(xAxis, yAxis));
-//            }
             ParquetInputFormat.setFilterPredicate(job.getConfiguration(), fp);
 
             long parseAndCubeIndex = System.currentTimeMillis() - startTime;

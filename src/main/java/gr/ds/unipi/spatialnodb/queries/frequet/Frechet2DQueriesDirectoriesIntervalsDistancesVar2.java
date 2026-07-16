@@ -282,11 +282,6 @@ public class Frechet2DQueriesDirectoriesIntervalsDistancesVar2 {
             final double queryMaxLongitude = Double.min(maxLon-0.0000001,mbrMaxLongitude+epsilon);
             final double queryMaxLatitude = Double.min(maxLat-0.0000001,mbrMaxLatitude+epsilon);
 
-//            FilterPredicate xAxis = and(gtEq(doubleColumn("minLongitude"), queryMinLongitude), ltEq(doubleColumn("maxLongitude"), queryMaxLongitude));
-//            FilterPredicate yAxis = and(gtEq(doubleColumn("minLatitude"), queryMinLatitude), ltEq(doubleColumn("maxLatitude"), queryMaxLatitude));
-//
-//            ParquetInputFormat.setFilterPredicate(jobIntersected.getConfiguration(), and(xAxis, yAxis));
-
             long[] hilStart = indexUtils.scale(queryMinLongitude, queryMinLatitude);//HilbertUtil.scaleGeoTemporalPoint(queryMinLongitude, minLon, maxLon,queryMinLatitude, minLat, maxLat, queryMinTimestamp, minTime, maxTime, maxOrdinates);
             long[] hilEnd = indexUtils.scale(queryMaxLongitude, queryMaxLatitude);//HilbertUtil.scaleGeoTemporalPoint(queryMaxLongitude, minLon, maxLon, queryMaxLatitude, minLat, maxLat, queryMaxTimestamp, minTime, maxTime, maxOrdinates);
             Ranges ranges = hilbertCurve.query(hilStart, hilEnd, 0);
@@ -319,15 +314,6 @@ public class Frechet2DQueriesDirectoriesIntervalsDistancesVar2 {
                 fp = or(fp, and(xAxis, yAxis));
             }
 
-//            FilterPredicate xAxis = and(gtEq(doubleColumn("minLongitude"), trajectoryQuery[0].getLongitude()-epsilon), ltEq(doubleColumn("maxLongitude"), trajectoryQuery[0].getLongitude()+epsilon));
-//            FilterPredicate yAxis = and(gtEq(doubleColumn("minLatitude"), trajectoryQuery[0].getLatitude()-epsilon), ltEq(doubleColumn("maxLatitude"), trajectoryQuery[0].getLatitude()+epsilon));
-//            FilterPredicate fp = and(xAxis, yAxis);
-//
-//            for (int i = 1; i < trajectoryQuery.length; i++) {
-//                xAxis = and(gtEq(doubleColumn("minLongitude"), trajectoryQuery[i].getLongitude()-epsilon), ltEq(doubleColumn("maxLongitude"), trajectoryQuery[i].getLongitude()+epsilon));
-//                yAxis = and(gtEq(doubleColumn("minLatitude"), trajectoryQuery[i].getLatitude()-epsilon), ltEq(doubleColumn("maxLatitude"), trajectoryQuery[i].getLatitude()+epsilon));
-//                fp = or(fp, and(xAxis, yAxis));
-//            }
             ParquetInputFormat.setFilterPredicate(job.getConfiguration(), fp);
 
             long parseAndCubeIndex = System.currentTimeMillis() - startTime;
