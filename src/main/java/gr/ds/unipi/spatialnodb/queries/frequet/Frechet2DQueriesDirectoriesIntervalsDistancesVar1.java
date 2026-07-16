@@ -247,7 +247,7 @@ public class Frechet2DQueriesDirectoriesIntervalsDistancesVar1 {
 
             if(sbIntersected.length()!=0){
                 sbIntersected.deleteCharAt(sbIntersected.length()-1);
-                JavaPairRDD<Long, TrajectorySegmentWithIntervalMetadata> intersectedPairRDD = (JavaPairRDD<Long, TrajectorySegmentWithIntervalMetadata>) jsc.newAPIHadoopFile(sbIntersected.toString(), ParquetInputFormat.class, Long.class, TrajectorySegmentWithIntervalMetadata.class, jobIntersected.getConfiguration());
+                JavaPairRDD<Long, TrajectorySegmentWithIntervalMetadata> intersectedPairRDD = (JavaPairRDD<Long, TrajectorySegmentWithIntervalMetadata>) jsc.newAPIHadoopFile(sbIntersected.toString(), ParquetInputFormatWithKey.class, Long.class, TrajectorySegmentWithIntervalMetadata.class, jobIntersected.getConfiguration());
                 if(pairRDDRangeQuery==null) {
                     pairRDDRangeQuery = intersectedPairRDD;
                 }

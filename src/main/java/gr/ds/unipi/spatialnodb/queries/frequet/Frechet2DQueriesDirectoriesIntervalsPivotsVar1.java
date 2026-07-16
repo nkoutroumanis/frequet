@@ -7,6 +7,7 @@ import gr.ds.unipi.spatialnodb.dataloading.HilbertUtil;
 import gr.ds.unipi.spatialnodb.messages.common.IndexUtils;
 import gr.ds.unipi.spatialnodb.messages.common.SpatialPoint;
 import gr.ds.unipi.spatialnodb.messages.common.trajparquet.*;
+import gr.ds.unipi.spatialnodb.messages.common.trajparquet.pathReadParquet.ParquetInputFormatWithKey;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -176,6 +177,19 @@ public class Frechet2DQueriesDirectoriesIntervalsPivotsVar1 {
 
             ParquetInputFormat.setFilterPredicate(jobIntersected.getConfiguration(), and(xAxis, yAxis));
 
+            Map<Long, List<IndexInterval>> queryIndexIntervals= new HashMap<>();
+            int intervalStart = 1;
+            long currentHilValue = hilbertCurve.index(indexUtils.scale(trajectoryQuery[0].getLongitude(), trajectoryQuery[0].getLatitude()));
+            for (int i = 1; i < trajectoryQuery.length; i++) {
+                long hilbertValue = hilbertCurve.index(indexUtils.scale(trajectoryQuery[i].getLongitude(), trajectoryQuery[i].getLatitude()));
+                if(currentHilValue != hilbertValue){
+                    queryIndexIntervals.computeIfAbsent(currentHilValue, k -> new ArrayList<>()).add(IndexInterval.newIndexInterval(intervalStart, i));
+                    currentHilValue = hilbertValue;
+                    intervalStart = i + 1;
+                }
+            }
+            queryIndexIntervals.computeIfAbsent(currentHilValue, k -> new ArrayList<>()).add(IndexInterval.newIndexInterval(intervalStart, trajectoryQuery.length));
+
             long[] hilStart = indexUtils.scale(queryMinLongitude, queryMinLatitude);//HilbertUtil.scaleGeoTemporalPoint(queryMinLongitude, minLon, maxLon,queryMinLatitude, minLat, maxLat, queryMinTimestamp, minTime, maxTime, maxOrdinates);
             long[] hilEnd = indexUtils.scale(queryMaxLongitude, queryMaxLatitude);//HilbertUtil.scaleGeoTemporalPoint(queryMaxLongitude, minLon, maxLon, queryMaxLatitude, minLat, maxLat, queryMaxTimestamp, minTime, maxTime, maxOrdinates);
             Ranges ranges = hilbertCurve.query(hilStart, hilEnd, 0);
@@ -221,16 +235,16 @@ public class Frechet2DQueriesDirectoriesIntervalsPivotsVar1 {
                 continue;
             }
 
-            JavaPairRDD<Void, TrajectorySegmentWithMetadata> pairRDDRangeQuery = null;
+            JavaPairRDD<Long, TrajectorySegmentWithMetadata> pairRDDRangeQuery = null;
 
             if(sbFullyCovers.length() != 0){
                 sbFullyCovers.deleteCharAt(sbFullyCovers.length()-1);
-                pairRDDRangeQuery = (JavaPairRDD<Void, TrajectorySegmentWithMetadata>) jsc.newAPIHadoopFile(sbFullyCovers.toString(), ParquetInputFormat.class, Void.class, TrajectorySegmentWithMetadata.class, jobFullyContains.getConfiguration());
+                pairRDDRangeQuery = (JavaPairRDD<Long, TrajectorySegmentWithMetadata>) jsc.newAPIHadoopFile(sbFullyCovers.toString(), ParquetInputFormatWithKey.class, Long.class, TrajectorySegmentWithMetadata.class, jobFullyContains.getConfiguration());
             }
 
             if(sbIntersected.length()!=0){
                 sbIntersected.deleteCharAt(sbIntersected.length()-1);
-                JavaPairRDD<Void, TrajectorySegmentWithMetadata> intersectedPairRDD = (JavaPairRDD<Void, TrajectorySegmentWithMetadata>) jsc.newAPIHadoopFile(sbIntersected.toString(), ParquetInputFormat.class, Void.class, TrajectorySegmentWithMetadata.class, jobIntersected.getConfiguration());
+                JavaPairRDD<Long, TrajectorySegmentWithMetadata> intersectedPairRDD = (JavaPairRDD<Long, TrajectorySegmentWithMetadata>) jsc.newAPIHadoopFile(sbIntersected.toString(), ParquetInputFormatWithKey.class, Long.class, TrajectorySegmentWithMetadata.class, jobIntersected.getConfiguration());
                 if(pairRDDRangeQuery==null) {
                     pairRDDRangeQuery = intersectedPairRDD;
                 }
@@ -299,6 +313,33 @@ public class Frechet2DQueriesDirectoriesIntervalsPivotsVar1 {
 
                         List<TrajectorySegment> ts = new ArrayList<>(trSegments.size());
                         trSegments.forEach(e->ts.add(e.getTrajectorySegment()));
+
+                        //pruning
+                        Set<Long> trackletsCellIds = new HashSet<>(trSegments.size());
+                        f._2.forEach(t->trackletsCellIds.add(t._1));
+                        Set<Long> queryCellIds = queryIndexIntervals.keySet();
+                        queryCellIds.removeAll(trackletsCellIds);
+
+                        for (Long queryCellId : queryCellIds) {
+                            List<IndexInterval> indexInterval = queryIndexIntervals.get(queryCellId);
+                            for (int i = 0; i < indexInterval.size(); i++) {
+                                for (int j = indexInterval.get(i).getStart()-1; j <= indexInterval.get(i).getEnd()-1; j++) {
+                                    boolean r = true;
+                                    for (Long trackletsCellId : trackletsCellIds) {
+                                        long[] cube = hilbertCurve.point(trackletsCellId);
+                                        double xMin = minLon + (cube[0] * (maxLon-minLon)/(maxOrdinates+ 1L));
+                                        double yMin = minLat + (cube[1] * (maxLat-minLat)/(maxOrdinates+ 1L));
+                                        double xMax = minLon + ((cube[0]+1) * (maxLon-minLon)/(maxOrdinates+ 1L));
+                                        double yMax = minLat + ((cube[1]+1) * (maxLat-minLat)/(maxOrdinates+ 1L));
+                                        if(HilbertUtil.minDistPointToRectangle(trajectoryQuery[j].getLongitude(), trajectoryQuery[j].getLatitude(), xMin, yMin, xMax, yMax)<=epsilon){
+                                            r = false;
+                                            break;
+                                        }
+                                    }
+                                    if(r){return Collections.emptyIterator();}
+                                }
+                            }
+                        }
 
                         return Collections.singletonList(new Tuple2<Void, TrajectorySegment>(null, new TrajectorySegment(f._1, ts))).iterator();
                     }).filter(f-> HilbertUtil.frechetDistanceIsLessThanEpsilon(trajectoryQuery, f._2.getSpatialPoints(),epsilon));
