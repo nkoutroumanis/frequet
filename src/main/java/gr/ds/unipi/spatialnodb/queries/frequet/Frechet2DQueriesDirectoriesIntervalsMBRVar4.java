@@ -287,30 +287,30 @@ public class Frechet2DQueriesDirectoriesIntervalsMBRVar4 {
             JavaPairRDD<Void, TrajectorySegment> results = pairRDDRangeQuery.groupBy(f->f._2().getTrajectorySegment().getObjectId(), Integer.parseInt(args[0]))
                     .flatMapToPair(f->{
 
-                        List<TrajectorySegmentWithIntervalMetadata> trSegments = new ArrayList<>();
-                        f._2.forEach(t->trSegments.add(t._2));
+                        List<Tuple2<Long,TrajectorySegmentWithIntervalMetadata>> trSegments = new ArrayList<>();
+                        f._2.forEach(trSegments::add);
 
-                        Comparator<TrajectorySegmentWithIntervalMetadata> comparator = Comparator.comparingLong(d-> d.getInterval()[0]);
+                        Comparator<Tuple2<Long, TrajectorySegmentWithIntervalMetadata>> comparator = Comparator.comparingLong(d-> d._2.getInterval()[0]);
                         trSegments.sort(comparator);
 
-                        if(trSegments.size()==1 && trSegments.get(0).getInterval()[0]==1 && trSegments.get(0).getInterval()[1]<0){
-                            return Collections.singletonList(new Tuple2<Void, TrajectorySegment>(null, trSegments.get(0).getTrajectorySegment())).iterator();
+                        if(trSegments.size()==1 && trSegments.get(0)._2.getInterval()[0]==1 && trSegments.get(0)._2.getInterval()[1]<0){
+                            return Collections.singletonList(new Tuple2<Void, TrajectorySegment>(null, trSegments.get(0)._2.getTrajectorySegment())).iterator();
                         }
 
                         long y;
-                        if(trSegments.get(0).getInterval()[0]!=1 || trSegments.get(trSegments.size()-1).getInterval()[1]>0){
+                        if(trSegments.get(0)._2.getInterval()[0]!=1 || trSegments.get(trSegments.size()-1)._2.getInterval()[1]>0){
                             return Collections.emptyIterator();
                         }else{
-                            y = trSegments.get(0).getInterval()[1];
+                            y = trSegments.get(0)._2.getInterval()[1];
                         }
                         for (int i = 1; i < trSegments.size()-1; i++) {
-                                if(y+1 != trSegments.get(i).getInterval()[0]) {return Collections.emptyIterator();}
-                                y = trSegments.get(i).getInterval()[1];
+                            if(y+1 != trSegments.get(i)._2.getInterval()[0]) {return Collections.emptyIterator();}
+                            y = trSegments.get(i)._2.getInterval()[1];
                         }
-                        if(y+1!=trSegments.get(trSegments.size()-1).getInterval()[0]){return Collections.emptyIterator();}
+                        if(y+1!=trSegments.get(trSegments.size()-1)._2.getInterval()[0]){return Collections.emptyIterator();}
 
                         List<TrajectorySegment> ts = new ArrayList<>(trSegments.size());
-                        trSegments.forEach(e->ts.add(e.getTrajectorySegment()));
+                        trSegments.forEach(e->ts.add(e._2.getTrajectorySegment()));
 
                         //pruning
                         Set<Long> trackletsCellIds = new HashSet<>(trSegments.size());
