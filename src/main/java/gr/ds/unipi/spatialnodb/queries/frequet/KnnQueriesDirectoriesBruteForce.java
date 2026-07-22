@@ -5,7 +5,10 @@ import com.typesafe.config.ConfigFactory;
 import gr.ds.unipi.spatialnodb.dataloading.HilbertUtil;
 import gr.ds.unipi.spatialnodb.messages.common.SpatialPoint;
 import gr.ds.unipi.spatialnodb.messages.common.SpatioTemporalPoint;
-import gr.ds.unipi.spatialnodb.messages.common.trajparquet.*;
+import gr.ds.unipi.spatialnodb.messages.common.trajparquet.BoundedPriorityQueue;
+import gr.ds.unipi.spatialnodb.messages.common.trajparquet.TrajectoryScore;
+import gr.ds.unipi.spatialnodb.messages.common.trajparquet.TrajectorySegment;
+import gr.ds.unipi.spatialnodb.messages.common.trajparquet.TrajectorySegmentReadSupport;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -20,7 +23,10 @@ import org.davidmoten.hilbert.SmallHilbertCurve;
 
 import java.io.*;
 import java.nio.file.Paths;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 import static gr.ds.unipi.spatialnodb.AppConfig.loadConfig;
 

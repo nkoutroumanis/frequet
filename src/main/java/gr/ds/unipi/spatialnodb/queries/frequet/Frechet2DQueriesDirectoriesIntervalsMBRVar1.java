@@ -6,7 +6,6 @@ import gr.ds.unipi.spatialnodb.SparkLogParser;
 import gr.ds.unipi.spatialnodb.dataloading.HilbertUtil;
 import gr.ds.unipi.spatialnodb.messages.common.IndexUtils;
 import gr.ds.unipi.spatialnodb.messages.common.SpatialPoint;
-import gr.ds.unipi.spatialnodb.messages.common.trajparquet.IndexInterval;
 import gr.ds.unipi.spatialnodb.messages.common.trajparquet.TrajectorySegment;
 import gr.ds.unipi.spatialnodb.messages.common.trajparquet.TrajectorySegmentWithIntervalMetadata;
 import gr.ds.unipi.spatialnodb.messages.common.trajparquet.TrajectorySegmentWithIntervalMetadataReadSupport;
@@ -22,7 +21,6 @@ import org.apache.parquet.hadoop.ParquetInputFormat;
 import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaSparkContext;
-import org.apache.spark.broadcast.Broadcast;
 import org.apache.spark.sql.SparkSession;
 import org.davidmoten.hilbert.HilbertCurve;
 import org.davidmoten.hilbert.Range;
@@ -35,7 +33,7 @@ import java.nio.file.Paths;
 import java.util.*;
 
 import static gr.ds.unipi.spatialnodb.AppConfig.loadConfig;
-import static gr.ds.unipi.spatialnodb.dataloading.HilbertUtil.areTrajectoryPointsDistanceLessThanEpsilonToCube;
+import static gr.ds.unipi.spatialnodb.dataloading.HilbertUtil.minDistPointToRectangle;
 import static org.apache.parquet.filter2.predicate.FilterApi.*;
 
 public class Frechet2DQueriesDirectoriesIntervalsMBRVar1 {
@@ -79,30 +77,30 @@ public class Frechet2DQueriesDirectoriesIntervalsMBRVar1 {
         ParquetInputFormat.setReadSupportClass(jobIntersected, TrajectorySegmentWithIntervalMetadataReadSupport.class);
         ParquetInputFormat.setReadSupportClass(jobFullyContains, TrajectorySegmentWithIntervalMetadataReadSupport.class);
 
-        SparkConf sparkConf = new SparkConf().registerKryoClasses(new Class[]{SmallHilbertCurve.class});
+        SparkConf sparkConf = new SparkConf();
         sparkConf.setAppName("Similarity Querying in TrajParquet");
         if (!sparkConf.contains("spark.master")) {
             sparkConf.setMaster("local[*]").set("spark.executor.memory","4g");
         }
         SparkSession sparkSession = SparkSession.builder().config(sparkConf).getOrCreate();
         JavaSparkContext jsc = JavaSparkContext.fromSparkContext(sparkSession.sparkContext());
-        Broadcast<SmallHilbertCurve> smallHilbertCurveBr = jsc.<SmallHilbertCurve>broadcast(hilbertCurve);
+//        Broadcast<SmallHilbertCurve> smallHilbertCurveBr = jsc.<SmallHilbertCurve>broadcast(hilbertCurve);
 
-        Set<String> directoriesSet = new HashSet<>();
-        if(parquetPath.startsWith("hdfs://")){
+        Set<Long> directoriesSet = new HashSet<>();
+        if (parquetPath.startsWith("hdfs://")) {
             Path stIndexPath = new Path(parquetPath + "/stIndex");
             FileSystem fs = stIndexPath.getFileSystem(jobIntersected.getConfiguration());
             FileStatus[] statuses = fs.listStatus(stIndexPath);
 
             for (FileStatus status : statuses) {
                 if (status.isDirectory()) {
-                    directoriesSet.add(status.getPath().getName());
+                    directoriesSet.add(Long.parseLong(status.getPath().getName()));
                 }
             }
-        }else{
-            File[] directories = new File(parquetPath+ File.separator+"stIndex").listFiles(File::isDirectory);
+        } else {
+            File[] directories = new File(parquetPath + File.separator + "stIndex").listFiles(File::isDirectory);
             for (File directory : directories) {
-                directoriesSet.add(directory.getName());
+                directoriesSet.add(Long.parseLong(directory.getName()));
             }
         }
 
@@ -182,53 +180,99 @@ public class Frechet2DQueriesDirectoriesIntervalsMBRVar1 {
 
             ParquetInputFormat.setFilterPredicate(jobIntersected.getConfiguration(), and(xAxis, yAxis));
 
-            Map<Long, List<IndexInterval>> queryIndexIntervals= new HashMap<>();
-            int intervalStart = 1;
-            long currentHilValue = hilbertCurve.index(indexUtils.scale(trajectoryQuery[0].getLongitude(), trajectoryQuery[0].getLatitude()));
-            for (int i = 1; i < trajectoryQuery.length; i++) {
-                long hilbertValue = hilbertCurve.index(indexUtils.scale(trajectoryQuery[i].getLongitude(), trajectoryQuery[i].getLatitude()));
-                if(currentHilValue != hilbertValue){
-                    queryIndexIntervals.computeIfAbsent(currentHilValue, k -> new ArrayList<>()).add(IndexInterval.newIndexInterval(intervalStart, i));
-                    currentHilValue = hilbertValue;
-                    intervalStart = i + 1;
-                }
-            }
-            queryIndexIntervals.computeIfAbsent(currentHilValue, k -> new ArrayList<>()).add(IndexInterval.newIndexInterval(intervalStart, trajectoryQuery.length));
+//            Map<Long, List<IndexInterval>> queryIndexIntervals= new HashMap<>();
+//            int intervalStart = 1;
+//            long currentHilValue = hilbertCurve.index(indexUtils.scale(trajectoryQuery[0].getLongitude(), trajectoryQuery[0].getLatitude()));
+//            for (int i = 1; i < trajectoryQuery.length; i++) {
+//                long hilbertValue = hilbertCurve.index(indexUtils.scale(trajectoryQuery[i].getLongitude(), trajectoryQuery[i].getLatitude()));
+//                if(currentHilValue != hilbertValue){
+//                    queryIndexIntervals.computeIfAbsent(currentHilValue, k -> new ArrayList<>()).add(IndexInterval.newIndexInterval(intervalStart, i));
+//                    currentHilValue = hilbertValue;
+//                    intervalStart = i + 1;
+//                }
+//            }
+//            queryIndexIntervals.computeIfAbsent(currentHilValue, k -> new ArrayList<>()).add(IndexInterval.newIndexInterval(intervalStart, trajectoryQuery.length));
+//
+//            long[] hilStart = indexUtils.scale(queryMinLongitude, queryMinLatitude);//HilbertUtil.scaleGeoTemporalPoint(queryMinLongitude, minLon, maxLon,queryMinLatitude, minLat, maxLat, queryMinTimestamp, minTime, maxTime, maxOrdinates);
+//            long[] hilEnd = indexUtils.scale(queryMaxLongitude, queryMaxLatitude);//HilbertUtil.scaleGeoTemporalPoint(queryMaxLongitude, minLon, maxLon, queryMaxLatitude, minLat, maxLat, queryMaxTimestamp, minTime, maxTime, maxOrdinates);
+//            Ranges ranges = hilbertCurve.query(hilStart, hilEnd, 0);
+//            StringBuilder sbFullyCovers = new StringBuilder();
+//            StringBuilder sbIntersected = new StringBuilder();
+//
+//                boolean flag = false;
+//                for (Range range : ranges.toList()) {
+//                    for (long r = range.low(); r <= range.high(); r++) {
+//                        if(directoriesSet.contains(String.valueOf(r))) {
+//                            long[] cube = hilbertCurve.point(r);
+//                            double xMin = minLon + (cube[0] * (maxLon-minLon)/(maxOrdinates+ 1L));
+//                            double yMin = minLat + (cube[1] * (maxLat-minLat)/(maxOrdinates+ 1L));
+//
+//                            double xMax = minLon + ((cube[0]+1) * (maxLon-minLon)/(maxOrdinates+ 1L));
+//                            double yMax = minLat + ((cube[1]+1) * (maxLat-minLat)/(maxOrdinates+ 1L));
+//
+//                            if(areTrajectoryPointsDistanceLessThanEpsilonToCube(trajectoryQuery, xMin, yMin, xMax, yMax,epsilon)){
+//                                for (int i = 0; i < cube.length; i++) {
+//                                    if(cube[i] == hilStart[i] || cube[i] == hilEnd[i]) {
+//                                        flag = true;
+//                                        break;
+//                                    }
+//                                }
+//                                if(flag) {
+//                                    sbIntersected.append(parquetPath+ File.separator+"stIndex"+File.separator+r+",");
+//                                }else{
+//                                    sbFullyCovers.append(parquetPath+ File.separator+"stIndex"+File.separator+r+",");
+//                                }
+//                                flag = false;
+//                            }
+//                        }
+//                    }
+//                }
+            long[] hilStartQueryMBR = indexUtils.scale(queryMinLongitude, queryMinLatitude);//HilbertUtil.scaleGeoTemporalPoint(queryMinLongitude, minLon, maxLon,queryMinLatitude, minLat, maxLat, queryMinTimestamp, minTime, maxTime, maxOrdinates);
+            long[] hilEndQueryMBR = indexUtils.scale(queryMaxLongitude, queryMaxLatitude);//HilbertUtil.scaleGeoTemporalPoint(queryMaxLongitude, minLon, maxLon, queryMaxLatitude, minLat, maxLat, queryMaxTimestamp, minTime, maxTime, maxOrdinates);
 
-            long[] hilStart = indexUtils.scale(queryMinLongitude, queryMinLatitude);//HilbertUtil.scaleGeoTemporalPoint(queryMinLongitude, minLon, maxLon,queryMinLatitude, minLat, maxLat, queryMinTimestamp, minTime, maxTime, maxOrdinates);
-            long[] hilEnd = indexUtils.scale(queryMaxLongitude, queryMaxLatitude);//HilbertUtil.scaleGeoTemporalPoint(queryMaxLongitude, minLon, maxLon, queryMaxLatitude, minLat, maxLat, queryMaxTimestamp, minTime, maxTime, maxOrdinates);
-            Ranges ranges = hilbertCurve.query(hilStart, hilEnd, 0);
-            StringBuilder sbFullyCovers = new StringBuilder();
-            StringBuilder sbIntersected = new StringBuilder();
+            Set<Long>[] mappedCells = new HashSet[trajectoryQuery.length];
+            Set<Long> queryCellsFullyCovered = new HashSet<>();
+            Set<Long> queryCellsIntersected = new HashSet<>();
 
-                boolean flag = false;
+            for (int i = 0; i < trajectoryQuery.length; i++) {
+                Set<Long> pointCellsSet = new HashSet<>();
+                long[] hilStart = indexUtils.scale(Math.max(minLon, trajectoryQuery[i].getLongitude()-epsilon), Math.max(minLat,trajectoryQuery[i].getLatitude()-epsilon));//HilbertUtil.scaleGeoTemporalPoint(queryMinLongitude, minLon, maxLon,queryMinLatitude, minLat, maxLat, queryMinTimestamp, minTime, maxTime, maxOrdinates);
+                long[] hilEnd = indexUtils.scale(Math.min(maxLon-0.0000001, trajectoryQuery[i].getLongitude()+epsilon), Math.min(maxLat-0.0000001, trajectoryQuery[i].getLatitude()+epsilon));//HilbertUtil.scaleGeoTemporalPoint(queryMaxLongitude, minLon, maxLon, queryMaxLatitude, minLat, maxLat, queryMaxTimestamp, minTime, maxTime, maxOrdinates);
+                Ranges ranges = hilbertCurve.query(hilStart, hilEnd, 0);
+
                 for (Range range : ranges.toList()) {
                     for (long r = range.low(); r <= range.high(); r++) {
-                        if(directoriesSet.contains(String.valueOf(r))) {
-                            long[] cube = hilbertCurve.point(r);
-                            double xMin = minLon + (cube[0] * (maxLon-minLon)/(maxOrdinates+ 1L));
-                            double yMin = minLat + (cube[1] * (maxLat-minLat)/(maxOrdinates+ 1L));
+                        long[] cube = hilbertCurve.point(r);
+                        double xMin = minLon + (cube[0] * (maxLon-minLon)/(maxOrdinates+ 1L));
+                        double yMin = minLat + (cube[1] * (maxLat-minLat)/(maxOrdinates+ 1L));
 
-                            double xMax = minLon + ((cube[0]+1) * (maxLon-minLon)/(maxOrdinates+ 1L));
-                            double yMax = minLat + ((cube[1]+1) * (maxLat-minLat)/(maxOrdinates+ 1L));
+                        double xMax = minLon + ((cube[0]+1) * (maxLon-minLon)/(maxOrdinates+ 1L));
+                        double yMax = minLat + ((cube[1]+1) * (maxLat-minLat)/(maxOrdinates+ 1L));
 
-                            if(areTrajectoryPointsDistanceLessThanEpsilonToCube(trajectoryQuery, xMin, yMin, xMax, yMax,epsilon)){
-                                for (int i = 0; i < cube.length; i++) {
-                                    if(cube[i] == hilStart[i] || cube[i] == hilEnd[i]) {
-                                        flag = true;
-                                        break;
-                                    }
-                                }
-                                if(flag) {
-                                    sbIntersected.append(parquetPath+ File.separator+"stIndex"+File.separator+r+",");
+                        if(minDistPointToRectangle(trajectoryQuery[i].getLongitude(), trajectoryQuery[i].getLatitude(), xMin, yMin, xMax, yMax)<=epsilon){
+                            pointCellsSet.add(r);
+                            if(directoriesSet.contains(r)) {
+                                if(cube[0] == hilStartQueryMBR[0] || cube[0] == hilEndQueryMBR[0] || cube[1] == hilStartQueryMBR[1] || cube[1] == hilEndQueryMBR[1]){
+                                    queryCellsIntersected.add(r);
                                 }else{
-                                    sbFullyCovers.append(parquetPath+ File.separator+"stIndex"+File.separator+r+",");
+                                    queryCellsFullyCovered.add(r);
                                 }
-                                flag = false;
                             }
                         }
                     }
                 }
+                mappedCells[i] = pointCellsSet;
+            }
+
+            StringBuilder sbIntersected = new StringBuilder();
+            for (Long queryCellsIds : queryCellsIntersected) {
+                sbIntersected.append(parquetPath+ File.separator+"stIndex"+File.separator+queryCellsIds+",");
+            }
+
+            StringBuilder sbFullyCovers = new StringBuilder();
+            for (Long queryCellsIds : queryCellsFullyCovered) {
+                sbFullyCovers.append(parquetPath+ File.separator+"stIndex"+File.separator+queryCellsIds+",");
+            }
 
             long parseAndCubeIndex = System.currentTimeMillis() - startTime;
 
@@ -327,29 +371,36 @@ public class Frechet2DQueriesDirectoriesIntervalsMBRVar1 {
                         //pruning
                         Set<Long> trackletsCellIds = new HashSet<>(trSegments.size());
                         f._2.forEach(t->trackletsCellIds.add(t._1));
-                        Set<Long> queryCellIds = queryIndexIntervals.keySet();
-                        queryCellIds.removeAll(trackletsCellIds);
 
-                        for (Long queryCellId : queryCellIds) {
-                            List<IndexInterval> indexInterval = queryIndexIntervals.get(queryCellId);
-                            for (int i = 0; i < indexInterval.size(); i++) {
-                                for (int j = indexInterval.get(i).getStart()-1; j <= indexInterval.get(i).getEnd()-1; j++) {
-                                    boolean r = true;
-                                    for (Long trackletsCellId : trackletsCellIds) {
-                                        long[] cube = smallHilbertCurveBr.getValue().point(trackletsCellId);
-                                        double xMin = minLon + (cube[0] * (maxLon-minLon)/(maxOrdinates+ 1L));
-                                        double yMin = minLat + (cube[1] * (maxLat-minLat)/(maxOrdinates+ 1L));
-                                        double xMax = minLon + ((cube[0]+1) * (maxLon-minLon)/(maxOrdinates+ 1L));
-                                        double yMax = minLat + ((cube[1]+1) * (maxLat-minLat)/(maxOrdinates+ 1L));
-                                        if(HilbertUtil.minDistPointToRectangle(trajectoryQuery[j].getLongitude(), trajectoryQuery[j].getLatitude(), xMin, yMin, xMax, yMax)<=epsilon){
-                                            r = false;
-                                            break;
-                                        }
-                                    }
-                                    if(r){return Collections.emptyIterator();}
-                                }
+                        for (Set<Long> mappedCell : mappedCells) {
+                            if (Collections.disjoint(mappedCell, trackletsCellIds)) {
+                                return Collections.emptyIterator();
                             }
                         }
+
+//                        Set<Long> queryCellIds = queryIndexIntervals.keySet();
+//                        queryCellIds.removeAll(trackletsCellIds);
+//
+//                        for (Long queryCellId : queryCellIds) {
+//                            List<IndexInterval> indexInterval = queryIndexIntervals.get(queryCellId);
+//                            for (int i = 0; i < indexInterval.size(); i++) {
+//                                for (int j = indexInterval.get(i).getStart()-1; j <= indexInterval.get(i).getEnd()-1; j++) {
+//                                    boolean r = true;
+//                                    for (Long trackletsCellId : trackletsCellIds) {
+//                                        long[] cube = smallHilbertCurveBr.getValue().point(trackletsCellId);
+//                                        double xMin = minLon + (cube[0] * (maxLon-minLon)/(maxOrdinates+ 1L));
+//                                        double yMin = minLat + (cube[1] * (maxLat-minLat)/(maxOrdinates+ 1L));
+//                                        double xMax = minLon + ((cube[0]+1) * (maxLon-minLon)/(maxOrdinates+ 1L));
+//                                        double yMax = minLat + ((cube[1]+1) * (maxLat-minLat)/(maxOrdinates+ 1L));
+//                                        if(HilbertUtil.minDistPointToRectangle(trajectoryQuery[j].getLongitude(), trajectoryQuery[j].getLatitude(), xMin, yMin, xMax, yMax)<=epsilon){
+//                                            r = false;
+//                                            break;
+//                                        }
+//                                    }
+//                                    if(r){return Collections.emptyIterator();}
+//                                }
+//                            }
+//                        }
 
                         return Collections.singletonList(new Tuple2<Void, TrajectorySegment>(null, new TrajectorySegment(f._1, ts))).iterator();
                     }).filter(f-> HilbertUtil.frechetDistanceIsLessThanEpsilon(trajectoryQuery, f._2.getSpatialPoints(),epsilon));
