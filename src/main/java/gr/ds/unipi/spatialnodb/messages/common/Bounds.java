@@ -3,6 +3,7 @@ package gr.ds.unipi.spatialnodb.messages.common;
 import java.io.Serializable;
 import java.util.List;
 
+import gr.ds.unipi.spatialnodb.messages.common.tman.TManRecord;
 import gr.ds.unipi.spatialnodb.messages.common.trajparquet.TrajectorySegment;
 import scala.Tuple3;
 
@@ -45,6 +46,14 @@ public class Bounds implements Serializable {
         maxLon = Math.max(maxLon, ts.getMaxLongitude());
         maxLat = Math.max(maxLat, ts.getMaxLatitude());
     }
+
+    public void add(double[] bounds) {
+        minLon = Math.min(minLon, bounds[0]);
+        minLat = Math.min(minLat, bounds[1]);
+        maxLon = Math.max(maxLon, bounds[2]);
+        maxLat = Math.max(maxLat, bounds[3]);
+    }
+
 
     public void merge(Bounds o) {
         minLon = Math.min(minLon, o.minLon);

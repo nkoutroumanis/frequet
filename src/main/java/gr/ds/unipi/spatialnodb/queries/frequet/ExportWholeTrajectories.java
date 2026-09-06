@@ -20,7 +20,7 @@ import static gr.ds.unipi.spatialnodb.AppConfig.loadConfig;
 
 public class ExportWholeTrajectories {
     public static void main(String[] args) {
-        Config config = loadConfig("export-trajectories-worldtrace.conf");
+        Config config = loadConfig("export-trajectories-berlinmod.conf");
 
         Config dataLoading = config.getConfig("export-trajectories");
         final String rawDataPath = dataLoading.getString("rawDataPath");
@@ -38,12 +38,12 @@ public class ExportWholeTrajectories {
         SparkConf sparkConf = new SparkConf()/*.setMaster("local[*]").set("spark.executor.memory","1g")*/.registerKryoClasses(new Class[]{SmallHilbertCurve.class, HilbertUtil.class});
         sparkConf.setAppName("Export whole Trajectories from raw files");
         if (!sparkConf.contains("spark.master")) {
-            sparkConf.setMaster("local[*]").set("spark.executor.memory","4g");
+            sparkConf.setMaster("local[*]").set("spark.executor.memory","6g");
         }
         SparkSession sparkSession = SparkSession.builder().config(sparkConf).getOrCreate();
         JavaSparkContext jsc = JavaSparkContext.fromSparkContext(sparkSession.sparkContext());
 
-        List<List<Tuple3<Double, Double, Long>>> trajectories = jsc.textFile(rawDataPath).map(f->f.split(delimiter))
+       jsc.textFile(rawDataPath).map(f->f.split(delimiter))
                 .filter(fields -> {
                     try {
                         Double.parseDouble(fields[latitudeIndex]);
@@ -82,19 +82,26 @@ public class ExportWholeTrajectories {
             tuple.sort(comp);
 
             return tuple;
-        }).filter(f-> f.size() != 1).filter(f->f.size()<=200).takeSample(false, n);
+        }).filter(f-> f.size() != 1)//.collect();//.filter(f-> f.size() != 1).filter(f->f.size()<=200).takeSample(false, n);
+               .map(f->{
+                   StringBuilder sb = new StringBuilder();
+                   for (Tuple3<Double, Double, Long> doubleDoubleLongTuple3 : f) {
+                       sb.append(doubleDoubleLongTuple3._1()).append(",").append(doubleDoubleLongTuple3._2()).append(",").append(doubleDoubleLongTuple3._3()).append(";");
+                   }
+                   return sb.toString();
+               })
+               .coalesce(1).saveAsTextFile("/Users/nicholaskoutroumanis/Documents/Implementations/InteliJ IDEA Projects/Frequet/data/berlinmod/hori/");
 
-
-        try (BufferedWriter writer = new BufferedWriter(new FileWriter(writePath))) {
-            for (List<Tuple3<Double, Double, Long>> trajectory : trajectories) {
-                for (Tuple3<Double, Double, Long> doubleDoubleLongTuple3 : trajectory) {
-                    writer.write(doubleDoubleLongTuple3._1()+","+doubleDoubleLongTuple3._2()+","+doubleDoubleLongTuple3._3()+";");
-                }
-                writer.newLine();
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+//        try (BufferedWriter writer = new BufferedWriter(new FileWriter(writePath))) {
+//            for (List<Tuple3<Double, Double, Long>> trajectory : trajectories) {
+//                for (Tuple3<Double, Double, Long> doubleDoubleLongTuple3 : trajectory) {
+//                    writer.write(doubleDoubleLongTuple3._1()+","+doubleDoubleLongTuple3._2()+","+doubleDoubleLongTuple3._3()+";");
+//                }
+//                writer.newLine();
+//            }
+//        } catch (IOException e) {
+//            e.printStackTrace();
+//        }
 
     }
 }

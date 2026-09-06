@@ -1,5 +1,7 @@
 package gr.ds.unipi.spatialnodb;
 
+import com.github.davidmoten.geo.Coverage;
+import com.github.davidmoten.geo.GeoHash;
 import com.mongodb.client.model.geojson.LineString;
 import com.mongodb.client.model.geojson.Position;
 import com.uber.h3core.H3Core;
@@ -824,6 +826,12 @@ public class HilbertUtilTest {
 
         }    }
 
+    @Test
+    public void geohash() throws IOException {
+
+        Coverage coverage = GeoHash.coverBoundingBoxMaxHashes(38.033511414679346, 23.6769045977094, 36.3200020602348, 20.556832555097426,1);
+        System.out.println(coverage.getHashes());
+    }
 
 
 
