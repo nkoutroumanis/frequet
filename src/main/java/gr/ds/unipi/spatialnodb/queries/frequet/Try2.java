@@ -20,7 +20,6 @@ import org.apache.parquet.hadoop.ParquetInputFormat;
 import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaSparkContext;
-import org.apache.spark.broadcast.Broadcast;
 import org.apache.spark.sql.SparkSession;
 import org.davidmoten.hilbert.HilbertCurve;
 import org.davidmoten.hilbert.Range;
@@ -432,9 +431,9 @@ public class Try2 {
                             .orElseThrow(() -> new IllegalStateException(
                                     "No event log file found for application " + applicationId));
 
-            List<Long>[] lists = SparkLogParser.getTimeFromTwoStagesPerJob(eventLogFile.getAbsolutePath());
+            List<Long>[] lists = SparkLogParser.getMetricsAndTimeStagesPerJob(eventLogFile.getAbsolutePath());
             try {
-                SparkLogParser.enrichQueryAdHocFile(fullPathExportedFile, lists);
+                SparkLogParser.enrichQueryAdHocFileWithMetricsAndTimeStages(fullPathExportedFile, lists);
             }catch (Exception e) {
                 e.printStackTrace();
             }

@@ -1,38 +1,31 @@
 package gr.ds.unipi.spatialnodb;
 
-import scala.Tuple2;
-import scala.Tuple3;
-
 import java.io.*;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 public class SparkLogParser {
 
     public static void main(String[] args) throws IOException {
-        System.out.println(getTimeFromTwoStagesPerJob("/Users/nicholaskoutroumanis/Desktop/application_1781548784779_0035"));
+        System.out.println(getMetricsAndTimeStagesPerJob("/Users/nicholaskoutroumanis/Desktop/application_1781548784779_0035"));
     }
 
-    public static void enrichQueryAdHocFile(String path, List<Long>... stages) throws Exception {
+    public static void enrichQueryAdHocFileWithMetricsAndTimeStages(String path, List<Long>... stages) throws Exception {
         String line;
         BufferedWriter bw = new BufferedWriter(new FileWriter(path.replaceAll("\\.[^.]+$", ".tmp")));
         BufferedReader br = new BufferedReader(new FileReader(path));
         line = br.readLine();
-        bw.write(line+"\tStage1\tStage2\tShuffled Remote Bytes\n");
+        bw.write(line+"\tStage1\tStage2\tShuffled Remote Bytes\tTotal Bytes Read\tBytes Read\n");
         int i = 0;
         while ((line = br.readLine()) != null) {
             if(line.contains("false")){
-                bw.write(line+"\t0\t0\t0\n");
+                bw.write(line+"\t0\t0\t0\t0\t0\n");
                 bw.newLine();
             }else if(line.contains("true")){
-                bw.write(line+"\t"+stages[0].get(i)+"\t"+stages[1].get(i)+"\t"+stages[2].get(i));
+                bw.write(line+"\t"+stages[0].get(i)+"\t"+stages[1].get(i)+"\t"+stages[2].get(i)+"\t"+stages[3].get(i)+"\t"+stages[4].get(i));
                 bw.newLine();
                 i++;
             }else{
@@ -42,6 +35,26 @@ public class SparkLogParser {
                     throw new RuntimeException(e);
                 }
             }
+        }
+        if(i!=stages[0].size()){
+            throw new RuntimeException("Problem with integrating the info from sparks logs to query file."+i+" -> "+stages[0].size());
+        }
+        bw.close();
+        br.close();
+        Files.move(Paths.get(path.replaceAll("\\.[^.]+$", ".tmp")), Paths.get(path), StandardCopyOption.REPLACE_EXISTING);
+    }
+
+    public static void enrichQueryAdHocFileWithMetrics(String path, List<Long>... stages) throws Exception {
+        String line;
+        BufferedWriter bw = new BufferedWriter(new FileWriter(path.replaceAll("\\.[^.]+$", ".tmp")));
+        BufferedReader br = new BufferedReader(new FileReader(path));
+        line = br.readLine();
+        bw.write(line+"\tShuffled Remote Bytes\tTotal Bytes Read\tBytes Read\n");
+        int i = 0;
+        while ((line = br.readLine()) != null) {
+            bw.write(line+"\t"+stages[0].get(i)+"\t"+stages[1].get(i)+"\t"+stages[2].get(i)+"\t"+stages[3].get(i)+"\t"+stages[4].get(i));
+            bw.newLine();
+            i++;
         }
         if(i!=stages[0].size()){
             throw new RuntimeException("Problem with integrating the info from sparks logs to query file."+i+" -> "+stages[0].size());
@@ -75,17 +88,23 @@ public class SparkLogParser {
 //        Files.move(Paths.get(path.replaceAll("\\.[^.]+$", ".tmp")), Paths.get(path), StandardCopyOption.REPLACE_EXISTING);
 //    }
 
-    public static List<Long>[] getTimeFromTwoStagesPerJob(String filePath){
+    public static List<Long>[] getMetricsAndTimeStagesPerJob(String filePath){
         try {
             List<Long> times = new ArrayList<>();
             List<Long> stage1;
             List<Long> stage2;
             List<Long> shuffled = new ArrayList<>();
+            List<Long> totalBytesReadList = new ArrayList<>();
+            List<Long> bytesReadList = new ArrayList<>();
+
             BufferedReader br = new BufferedReader(new FileReader(filePath));
             String line;
             long submissionTime = 0;
             long completedTime = 0;
             long shuffledBytes = 0;
+            long totalBytesRead = 0;
+            long bytesRead = 0;
+
             while((line = br.readLine())!=null){
                 if(line.contains("\"SparkListenerStageCompleted\"")){
                     int index = line.indexOf("\"Submission Time\":");
@@ -101,7 +120,11 @@ public class SparkLogParser {
 
                 if(line.contains("\"SparkListenerJobEnd\"")){
                     shuffled.add(shuffledBytes);
+                    totalBytesReadList.add(totalBytesRead);
+                    bytesReadList.add(bytesRead);
                     shuffledBytes = 0;
+                    totalBytesRead = 0;
+                    bytesRead = 0;
                 }
 
                 if(line.contains("\"Remote Bytes Read\"")){
@@ -109,6 +132,19 @@ public class SparkLogParser {
                     String subline = line.substring(index);
                     shuffledBytes = shuffledBytes + Long.parseLong(subline.substring(0,subline.indexOf(",")).substring(subline.indexOf(":")+1));
                 }
+
+                if(line.contains("\"Total Bytes Read\"")){
+                    int index = line.indexOf("\"Total Bytes Read\"");
+                    String subline = line.substring(index);
+                    totalBytesRead = totalBytesRead + Long.parseLong(subline.substring(0,subline.indexOf(",")).substring(subline.indexOf(":")+1));
+                }
+
+                if(line.contains("\"Bytes Read\"")){
+                    int index = line.indexOf("\"Bytes Read\"");
+                    String subline = line.substring(index);
+                    bytesRead = bytesRead + Long.parseLong(subline.substring(0,subline.indexOf(",")).substring(subline.indexOf(":")+1));
+                }
+
             }
             stage1 = new ArrayList<>(times.size()/2);
             stage2 = new ArrayList<>(times.size()/2);
@@ -120,11 +156,59 @@ public class SparkLogParser {
                     stage2.add(times.get(i));
                 }
             }
-            return new List[]{stage1, stage2, shuffled};
+            return new List[]{stage1, stage2, shuffled, totalBytesReadList, bytesReadList};
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
     }
+
+    public static List<Long>[] getMetricsPerJob(String filePath){
+        try {
+            List<Long> shuffled = new ArrayList<>();
+            List<Long> totalBytesReadList = new ArrayList<>();
+            List<Long> bytesReadList = new ArrayList<>();
+
+            BufferedReader br = new BufferedReader(new FileReader(filePath));
+            String line;
+            long shuffledBytes = 0;
+            long totalBytesRead = 0;
+            long bytesRead = 0;
+
+            while((line = br.readLine())!=null){
+                if(line.contains("\"SparkListenerJobEnd\"")){
+                    shuffled.add(shuffledBytes);
+                    totalBytesReadList.add(totalBytesRead);
+                    bytesReadList.add(bytesRead);
+                    shuffledBytes = 0;
+                    totalBytesRead = 0;
+                    bytesRead = 0;
+                }
+
+                if(line.contains("\"Remote Bytes Read\"")){
+                    int index = line.indexOf("\"Remote Bytes Read\"");
+                    String subline = line.substring(index);
+                    shuffledBytes = shuffledBytes + Long.parseLong(subline.substring(0,subline.indexOf(",")).substring(subline.indexOf(":")+1));
+                }
+
+                if(line.contains("\"Total Bytes Read\"")){
+                    int index = line.indexOf("\"Total Bytes Read\"");
+                    String subline = line.substring(index);
+                    totalBytesRead = totalBytesRead + Long.parseLong(subline.substring(0,subline.indexOf(",")).substring(subline.indexOf(":")+1));
+                }
+
+                if(line.contains("\"Bytes Read\"")){
+                    int index = line.indexOf("\"Bytes Read\"");
+                    String subline = line.substring(index);
+                    bytesRead = bytesRead + Long.parseLong(subline.substring(0,subline.indexOf(",")).substring(subline.indexOf(":")+1));
+                }
+
+            }
+            return new List[]{shuffled, totalBytesReadList, bytesReadList};
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
 
     public static String getProperty(String filePath, String property){
         try {

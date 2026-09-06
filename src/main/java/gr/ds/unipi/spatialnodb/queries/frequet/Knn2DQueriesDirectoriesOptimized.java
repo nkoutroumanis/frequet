@@ -2,6 +2,7 @@ package gr.ds.unipi.spatialnodb.queries.frequet;
 
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
+import gr.ds.unipi.spatialnodb.SparkLogParser;
 import gr.ds.unipi.spatialnodb.dataloading.HilbertUtil;
 import gr.ds.unipi.spatialnodb.messages.common.IndexUtils;
 import gr.ds.unipi.spatialnodb.messages.common.SpatialPoint;
@@ -106,7 +107,9 @@ public class Knn2DQueriesDirectoriesOptimized {
         int issuedQueriesTracklets = 0;
         int issuedQueriesFrechetComputation = 0;
 
-        BufferedWriter bw = new BufferedWriter(new FileWriter(metricsPath+ File.separator+"knn-queries-"+Paths.get(parquetPath).getFileName().toString()+"-"+ Paths.get(queriesFilePath).getFileName().toString().replaceFirst("\\.[^.]+$", "")+".txt"));
+        String fullPathExportedFile = metricsPath+ File.separator+"knn-queries-"+Paths.get(parquetPath).getFileName().toString()+"-"+ Paths.get(queriesFilePath).getFileName().toString().replaceFirst("\\.[^.]+$", "")+".txt";
+
+        BufferedWriter bw = new BufferedWriter(new FileWriter(fullPathExportedFile));
         BufferedReader br = new BufferedReader(new FileReader(queriesFilePath));
         bw.write("Time Exec\tQuery Points\tNum of Trajectories\tk-th Distance\tNum of Points\tData Pages\tParse\tMetadata Rounds\tTrajectory Query Rounds\tChecked Trajectories\n");
 
@@ -451,7 +454,29 @@ public class Knn2DQueriesDirectoriesOptimized {
         bw.close();
         br.close();
 
+        String applicationId = sparkSession.sparkContext().applicationId();
+
         sparkSession.close();
+
+        if(sparkConf.getBoolean("spark.eventLog.enabled",false)){
+            String eventLogDir = sparkConf.get("spark.eventLog.dir");
+            File dir = new File(eventLogDir.replace("file:", ""));
+            File eventLogFile =
+                    Arrays.stream(dir.listFiles())
+                            .filter(File::isFile)
+                            .filter(f -> f.getName().contains(applicationId))
+                            .findFirst()
+                            .orElseThrow(() -> new IllegalStateException(
+                                    "No event log file found for application " + applicationId));
+
+            List<Long>[] lists = SparkLogParser.getMetricsPerJob(eventLogFile.getAbsolutePath());
+            try {
+                SparkLogParser.enrichQueryAdHocFileWithMetrics(fullPathExportedFile, lists);
+            }catch (Exception e) {
+                e.printStackTrace();
+            }
+            eventLogFile.delete();
+        }
     }
 
     private static void flush(HashMap<String, List<TrajectorySegmentWithMetadata>> identifiedTrajectories, HashSet<Binary> flushedtrajectories){
