@@ -347,8 +347,8 @@ public class Knn2DQueriesDirectoriesOptimizedNew {
         while ((line = br.readLine()) != null) {
             String[] values = line.split("\t");
             int n = values.length;
-            int previous = Integer.parseInt(values[n - 3]);
-            int beforePrevious = Integer.parseInt(values[n - 2]);
+            int previous = Integer.parseInt(values[n - 2]);
+            int beforePrevious = Integer.parseInt(values[n - 3]);
             queryEndJobs.add(beforePrevious+previous);
         }
 
@@ -363,7 +363,7 @@ public class Knn2DQueriesDirectoriesOptimizedNew {
                             .orElseThrow(() -> new IllegalStateException(
                                     "No event log file found for application " + applicationId));
 
-            List<Long>[] lists = SparkLogParser.getMetricsPerJob(eventLogFile.getAbsolutePath(),queryEndJobs);
+            List<Long>[] lists = SparkLogParser.getMetricsPerNJobs(eventLogFile.getAbsolutePath(),queryEndJobs);
             try {
                 SparkLogParser.enrichQueryAdHocFileWithMetrics(fullPathExportedFile, lists);
             }catch (Exception e) {

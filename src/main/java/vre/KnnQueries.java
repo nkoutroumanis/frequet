@@ -466,6 +466,18 @@ public class KnnQueries {
 
         sparkSession.close();
 
+        br = new BufferedReader(new FileReader(fullPathExportedFile));
+        List<Integer> queryEndJobs = new ArrayList<>();
+        br.readLine();
+        String line;
+        while ((line = br.readLine()) != null) {
+            String[] values = line.split("\t");
+            int valuesNum = values.length;
+            int last = Integer.parseInt(values[valuesNum - 1]);
+            int previous = Integer.parseInt(values[valuesNum - 2]);
+            queryEndJobs.add(last+previous);
+        }
+
         if(sparkConf.getBoolean("spark.eventLog.enabled",false)){
             String eventLogDir = sparkConf.get("spark.eventLog.dir");
             File dir = new File(eventLogDir.replace("file:", ""));
@@ -477,9 +489,9 @@ public class KnnQueries {
                             .orElseThrow(() -> new IllegalStateException(
                                     "No event log file found for application " + applicationId));
 
-            List<Long>[] lists = SparkLogParser.getMetricsAndTimeStagesPerJob(eventLogFile.getAbsolutePath());
+            List<Long>[] lists = SparkLogParser.getMetricsPerNJobs(eventLogFile.getAbsolutePath(), queryEndJobs);
             try {
-                SparkLogParser.enrichQueryAdHocFileWithMetricsAndTimeStages(fullPathExportedFile, lists);
+                SparkLogParser.enrichQueryAdHocFileWithMetrics(fullPathExportedFile, lists);
             }catch (Exception e) {
                 e.printStackTrace();
             }

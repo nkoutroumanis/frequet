@@ -108,7 +108,8 @@ public class Frechet2DQueriesDirectoriesIntervalsPivotsHorizontal {
             }
         }
 
-        BufferedWriter bw = new BufferedWriter(new FileWriter(metricsPath+ File.separator+"frechet-queries-optimized-"+Paths.get(parquetPath).getFileName().toString()+"-"+ Paths.get(queriesFilePath).getFileName().toString().replaceFirst("\\.[^.]+$", "")+".txt"));
+        String fullPathExportedFile = metricsPath+ File.separator+"frechet-queries-optimized-"+Paths.get(parquetPath).getFileName().toString()+"-"+ Paths.get(queriesFilePath).getFileName().toString().replaceFirst("\\.[^.]+$", "")+".txt";
+        BufferedWriter bw = new BufferedWriter(new FileWriter(fullPathExportedFile));
         BufferedReader br = new BufferedReader(new FileReader(queriesFilePath));
         bw.write("Time Exec\tNum of Trajectories\tNum of Points\tIssued\tData Pages\tParse\n");
         String query;
@@ -333,6 +334,13 @@ public class Frechet2DQueriesDirectoriesIntervalsPivotsHorizontal {
 
         sparkSession.close();
 
+        br = new BufferedReader(new FileReader(fullPathExportedFile));
+        List<Integer> queryEndJobs = new ArrayList<>();
+        br.readLine();
+        while (br.readLine() != null) {
+            queryEndJobs.add(1);
+        }
+
         if(sparkConf.getBoolean("spark.eventLog.enabled",false)){
             String eventLogDir = sparkConf.get("spark.eventLog.dir");
             File dir = new File(eventLogDir.replace("file:", ""));
@@ -344,9 +352,10 @@ public class Frechet2DQueriesDirectoriesIntervalsPivotsHorizontal {
                             .orElseThrow(() -> new IllegalStateException(
                                     "No event log file found for application " + applicationId));
 
-            List<Long>[] lists = SparkLogParser.getMetricsAndTimeStagesPerJob(eventLogFile.getAbsolutePath());
+            List<Long>[] stages = SparkLogParser.getTimeStages(eventLogFile.getAbsolutePath(), 2);
+            List<Long>[] lists = SparkLogParser.getMetricsPerNJobs(eventLogFile.getAbsolutePath(), queryEndJobs);
             try {
-                SparkLogParser.enrichQueryAdHocFileWithMetricsAndTimeStages(metricsPath+ File.separator+"frechet-queries-optimized-intervals-"+Paths.get(parquetPath).getFileName().toString()+"-"+ Paths.get(queriesFilePath).getFileName().toString().replaceFirst("\\.[^.]+$", "")+".txt", lists);
+                SparkLogParser.enrichQueryAdHocFileWithStagesAndMetricsCondition(fullPathExportedFile, stages, lists);
             }catch (Exception e) {
                 e.printStackTrace();
             }

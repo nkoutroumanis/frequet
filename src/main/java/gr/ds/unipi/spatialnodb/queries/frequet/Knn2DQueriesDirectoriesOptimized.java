@@ -14,7 +14,6 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.parquet.column.page.DataPage;
-import org.apache.parquet.filter2.predicate.FilterPredicate;
 import org.apache.parquet.hadoop.ParquetInputFormat;
 import org.apache.parquet.io.api.Binary;
 import org.apache.spark.SparkConf;
@@ -487,7 +486,7 @@ public class Knn2DQueriesDirectoriesOptimized {
                             .orElseThrow(() -> new IllegalStateException(
                                     "No event log file found for application " + applicationId));
 
-            List<Long>[] lists = SparkLogParser.getMetricsPerJob(eventLogFile.getAbsolutePath(), queryEndJobs);
+            List<Long>[] lists = SparkLogParser.getMetricsPerNJobs(eventLogFile.getAbsolutePath(), queryEndJobs);
             try {
                 SparkLogParser.enrichQueryAdHocFileWithMetrics(fullPathExportedFile, lists);
             }catch (Exception e) {
