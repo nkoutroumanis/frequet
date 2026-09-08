@@ -310,10 +310,12 @@ public class Knn2DQueriesDirectoriesOptimized {
 
             while((trajectoryQueue.getSize() < k || queueCells.peek().getScore() < trajectoryQueue.getMaxScore()) && !queueCells.isEmpty()) {
                 sb.setLength(0);
-                int z = visitedCubes.size();
+                int z = 8;//visitedCubes.size();
                 while(z>0) {
-                    long cell = queueCells.poll().getCellId();
-                    visitedCubes.add(cell);
+                    CellScore cellScore = queueCells.poll();
+                    if(cellScore!=null) {
+                        long cell = cellScore.getCellId();
+                        visitedCubes.add(cell);
                         long[] cube = hilbertCurve.point(cell);
                         for (long i = Math.max(0, cube[0] - 1); i <= Math.min(maxOrdinates, cube[0] + 1); i++) {
                             for (long j = Math.max(0, cube[1] - 1); j <= Math.min(maxOrdinates, cube[1] + 1); j++) {
@@ -328,8 +330,11 @@ public class Knn2DQueriesDirectoriesOptimized {
                         String j = String.valueOf(hilbertCurve.index(cube[0], cube[1]));
                         if (directoriesSet.contains(j)) {
                             sb.append(parquetPath + File.separator + "stIndex" + File.separator + j + "/,");
+                            z--;
                         }
-                    z--;
+                    }else{
+                        break;
+                    }
                 }
 
                 if(sb.length()!=0){
@@ -431,7 +436,7 @@ public class Knn2DQueriesDirectoriesOptimized {
 //                System.out.println("object id:"+d.getTrajectorySegment().getObjectId()+" score:"+d.getScore());
 //            });
 
-            System.out.println("The max score is:"+trajectoryQueue.getMaxScore() +"examined trajectoreies are"+queriedTrajectoriesCounter);
+//            System.out.println("The max score is:"+trajectoryQueue.getMaxScore() +"examined trajectoreies are"+queriedTrajectoriesCounter);
 
 //            long num =trajectoryQueue.getSize();// trajs.size();
 
@@ -458,6 +463,19 @@ public class Knn2DQueriesDirectoriesOptimized {
 
         sparkSession.close();
 
+
+        br = new BufferedReader(new FileReader(fullPathExportedFile));
+        List<Integer> queryEndJobs = new ArrayList<>();
+        br.readLine();
+        String line;
+        while ((line = br.readLine()) != null) {
+            String[] values = line.split("\t");
+            int n = values.length;
+            int previous = Integer.parseInt(values[n - 3]);
+            int beforePrevious = Integer.parseInt(values[n - 2]);
+            queryEndJobs.add(beforePrevious+previous);
+        }
+
         if(sparkConf.getBoolean("spark.eventLog.enabled",false)){
             String eventLogDir = sparkConf.get("spark.eventLog.dir");
             File dir = new File(eventLogDir.replace("file:", ""));
@@ -469,7 +487,7 @@ public class Knn2DQueriesDirectoriesOptimized {
                             .orElseThrow(() -> new IllegalStateException(
                                     "No event log file found for application " + applicationId));
 
-            List<Long>[] lists = SparkLogParser.getMetricsPerJob(eventLogFile.getAbsolutePath());
+            List<Long>[] lists = SparkLogParser.getMetricsPerJob(eventLogFile.getAbsolutePath(), queryEndJobs);
             try {
                 SparkLogParser.enrichQueryAdHocFileWithMetrics(fullPathExportedFile, lists);
             }catch (Exception e) {

@@ -18,7 +18,7 @@ public class SparkLogParser {
         BufferedWriter bw = new BufferedWriter(new FileWriter(path.replaceAll("\\.[^.]+$", ".tmp")));
         BufferedReader br = new BufferedReader(new FileReader(path));
         line = br.readLine();
-        bw.write(line+"\tStage1\tStage2\tShuffled Remote Bytes\tTotal Bytes Read\tBytes Read\n");
+        bw.write(line+"\tStage1\tStage2\tShuffled Remote Bytes\tLocal Bytes Read\tBytes Read\n");
         int i = 0;
         while ((line = br.readLine()) != null) {
             if(line.contains("false")){
@@ -49,10 +49,10 @@ public class SparkLogParser {
         BufferedWriter bw = new BufferedWriter(new FileWriter(path.replaceAll("\\.[^.]+$", ".tmp")));
         BufferedReader br = new BufferedReader(new FileReader(path));
         line = br.readLine();
-        bw.write(line+"\tShuffled Remote Bytes\tTotal Bytes Read\tBytes Read\n");
+        bw.write(line+"\tShuffled Remote Bytes\tLocal Bytes Read\tBytes Read\n");
         int i = 0;
         while ((line = br.readLine()) != null) {
-            bw.write(line+"\t"+stages[0].get(i)+"\t"+stages[1].get(i)+"\t"+stages[2].get(i)+"\t"+stages[3].get(i)+"\t"+stages[4].get(i));
+            bw.write(line+"\t"+stages[0].get(i)+"\t"+stages[1].get(i)+"\t"+stages[2].get(i));
             bw.newLine();
             i++;
         }
@@ -94,7 +94,7 @@ public class SparkLogParser {
             List<Long> stage1;
             List<Long> stage2;
             List<Long> shuffled = new ArrayList<>();
-            List<Long> totalBytesReadList = new ArrayList<>();
+            List<Long> localBytesReadList = new ArrayList<>();
             List<Long> bytesReadList = new ArrayList<>();
 
             BufferedReader br = new BufferedReader(new FileReader(filePath));
@@ -102,7 +102,7 @@ public class SparkLogParser {
             long submissionTime = 0;
             long completedTime = 0;
             long shuffledBytes = 0;
-            long totalBytesRead = 0;
+            long localBytesRead = 0;
             long bytesRead = 0;
 
             while((line = br.readLine())!=null){
@@ -120,10 +120,10 @@ public class SparkLogParser {
 
                 if(line.contains("\"SparkListenerJobEnd\"")){
                     shuffled.add(shuffledBytes);
-                    totalBytesReadList.add(totalBytesRead);
+                    localBytesReadList.add(localBytesRead);
                     bytesReadList.add(bytesRead);
                     shuffledBytes = 0;
-                    totalBytesRead = 0;
+                    localBytesRead = 0;
                     bytesRead = 0;
                 }
 
@@ -133,10 +133,10 @@ public class SparkLogParser {
                     shuffledBytes = shuffledBytes + Long.parseLong(subline.substring(0,subline.indexOf(",")).substring(subline.indexOf(":")+1));
                 }
 
-                if(line.contains("\"Total Bytes Read\"")){
-                    int index = line.indexOf("\"Total Bytes Read\"");
+                if(line.contains("\"Local Bytes Read\"")){
+                    int index = line.indexOf("\"Local Bytes Read\"");
                     String subline = line.substring(index);
-                    totalBytesRead = totalBytesRead + Long.parseLong(subline.substring(0,subline.indexOf(",")).substring(subline.indexOf(":")+1));
+                    localBytesRead = localBytesRead + Long.parseLong(subline.substring(0,subline.indexOf(",")).substring(subline.indexOf(":")+1));
                 }
 
                 if(line.contains("\"Bytes Read\"")){
@@ -156,32 +156,41 @@ public class SparkLogParser {
                     stage2.add(times.get(i));
                 }
             }
-            return new List[]{stage1, stage2, shuffled, totalBytesReadList, bytesReadList};
+            return new List[]{stage1, stage2, shuffled, localBytesReadList, bytesReadList};
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
     }
 
-    public static List<Long>[] getMetricsPerJob(String filePath){
+    public static List<Long>[] getMetricsPerJob(String filePath, List<Integer> querySparkListenerJobEnd){
         try {
+            int queryIndex = 0;
+            int counter = 0;
             List<Long> shuffled = new ArrayList<>();
-            List<Long> totalBytesReadList = new ArrayList<>();
+            List<Long> localBytesReadList = new ArrayList<>();
             List<Long> bytesReadList = new ArrayList<>();
 
             BufferedReader br = new BufferedReader(new FileReader(filePath));
             String line;
             long shuffledBytes = 0;
-            long totalBytesRead = 0;
+            long localBytesRead = 0;
             long bytesRead = 0;
 
             while((line = br.readLine())!=null){
                 if(line.contains("\"SparkListenerJobEnd\"")){
-                    shuffled.add(shuffledBytes);
-                    totalBytesReadList.add(totalBytesRead);
-                    bytesReadList.add(bytesRead);
-                    shuffledBytes = 0;
-                    totalBytesRead = 0;
-                    bytesRead = 0;
+                    counter++;
+                    if(counter==querySparkListenerJobEnd.get(queryIndex)){
+                        shuffled.add(shuffledBytes);
+                        localBytesReadList.add(localBytesRead);
+                        bytesReadList.add(bytesRead);
+
+                        shuffledBytes = 0;
+                        localBytesRead = 0;
+                        bytesRead = 0;
+
+                        queryIndex++;
+                        counter=0;
+                    }
                 }
 
                 if(line.contains("\"Remote Bytes Read\"")){
@@ -190,10 +199,10 @@ public class SparkLogParser {
                     shuffledBytes = shuffledBytes + Long.parseLong(subline.substring(0,subline.indexOf(",")).substring(subline.indexOf(":")+1));
                 }
 
-                if(line.contains("\"Total Bytes Read\"")){
-                    int index = line.indexOf("\"Total Bytes Read\"");
+                if(line.contains("\"Local Bytes Read\"")){
+                    int index = line.indexOf("\"Local Bytes Read\"");
                     String subline = line.substring(index);
-                    totalBytesRead = totalBytesRead + Long.parseLong(subline.substring(0,subline.indexOf(",")).substring(subline.indexOf(":")+1));
+                    localBytesRead = localBytesRead + Long.parseLong(subline.substring(0,subline.indexOf(",")).substring(subline.indexOf(":")+1));
                 }
 
                 if(line.contains("\"Bytes Read\"")){
@@ -203,12 +212,11 @@ public class SparkLogParser {
                 }
 
             }
-            return new List[]{shuffled, totalBytesReadList, bytesReadList};
+            return new List[]{shuffled, localBytesReadList, bytesReadList};
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
     }
-
 
     public static String getProperty(String filePath, String property){
         try {

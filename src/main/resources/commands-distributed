@@ -37,23 +37,6 @@ spark-submit --class gr.ds.unipi.spatialnodb.queries.frequet.flat.Frechet2DQueri
 spark-submit --class gr.ds.unipi.spatialnodb.queries.frequet.flat.Frechet2DQueriesIntervalsDistancesVar2 --master yarn --deploy-mode client --jars './lib/*' --conf spark.yarn.archive="hdfs://node13:9000/user/trajparquet-jars.tar.gz" --executor-memory 4608m --executor-cores 2 --driver-memory 5g --num-executors 12 --conf spark.network.timeout=600s --conf "spark.executor.extraJavaOptions=-Xms4608m" --conf "spark.driver.extraJavaOptions=-Xms5g -Dconfig.file=queries-frechet.conf -Ddata-loading.hilbert.bits=10 -Ddataset=nari-dynamic -Dqueriesfilename=trajectories -Depsilon=0.2 -Dmethod=frequet" ./Frequet-1.0-SNAPSHOT.jar 72
 
 
-for dataset in berlinmod; do
-    case $dataset in
-        berlinmod)
-            epsilon=0.005
-            ;;
-        worldtrace|geolife)
-            epsilon=0.002
-            ;;
-    esac
-    for bits in $(seq 4 4); do
-        spark-submit --class gr.ds.unipi.spatialnodb.queries.frequet.Try1 --master yarn --deploy-mode client --jars './lib/*' --conf spark.yarn.archive="hdfs://node13:9000/user/trajparquet-jars.tar.gz" --executor-memory 4608m --executor-cores 2 --driver-memory 5g --num-executors 12 --conf spark.network.timeout=600s --conf "spark.executor.extraJavaOptions=-Xms4608m" --conf "spark.driver.extraJavaOptions=-Xms5g -Dconfig.file=queries-frechet-${dataset}.conf -Ddata-loading.hilbert.bits=$bits -Ddataset=$dataset -Dqueriesfilename=trajectories -Depsilon=${epsilon} -Dmethod=frequet" ./Frequet-1.0-SNAPSHOT.jar 72
-        spark-submit --class gr.ds.unipi.spatialnodb.queries.frequet.Try2 --master yarn --deploy-mode client --jars './lib/*' --conf spark.yarn.archive="hdfs://node13:9000/user/trajparquet-jars.tar.gz" --executor-memory 4608m --executor-cores 2 --driver-memory 5g --num-executors 12 --conf spark.network.timeout=600s --conf "spark.executor.extraJavaOptions=-Xms4608m" --conf "spark.driver.extraJavaOptions=-Xms5g -Dconfig.file=queries-frechet-${dataset}.conf -Ddata-loading.hilbert.bits=$bits -Ddataset=$dataset -Dqueriesfilename=trajectories -Depsilon=${epsilon} -Dmethod=frequet" ./Frequet-1.0-SNAPSHOT.jar 72
-        spark-submit --class gr.ds.unipi.spatialnodb.queries.frequet.Try3 --master yarn --deploy-mode client --jars './lib/*' --conf spark.yarn.archive="hdfs://node13:9000/user/trajparquet-jars.tar.gz" --executor-memory 4608m --executor-cores 2 --driver-memory 5g --num-executors 12 --conf spark.network.timeout=600s --conf "spark.executor.extraJavaOptions=-Xms4608m" --conf "spark.driver.extraJavaOptions=-Xms5g -Dconfig.file=queries-frechet-${dataset}.conf -Ddata-loading.hilbert.bits=$bits -Ddataset=$dataset -Dqueriesfilename=trajectories -Depsilon=${epsilon} -Dmethod=frequet" ./Frequet-1.0-SNAPSHOT.jar 72
-        spark-submit --class gr.ds.unipi.spatialnodb.queries.frequet.Try4 --master yarn --deploy-mode client --jars './lib/*' --conf spark.yarn.archive="hdfs://node13:9000/user/trajparquet-jars.tar.gz" --executor-memory 4608m --executor-cores 2 --driver-memory 5g --num-executors 12 --conf spark.network.timeout=600s --conf "spark.executor.extraJavaOptions=-Xms4608m" --conf "spark.driver.extraJavaOptions=-Xms5g -Dconfig.file=queries-frechet-${dataset}.conf -Ddata-loading.hilbert.bits=$bits -Ddataset=$dataset -Dqueriesfilename=trajectories -Depsilon=${epsilon} -Dmethod=frequet" ./Frequet-1.0-SNAPSHOT.jar 72
-    done
-done
-
 
 
 
@@ -74,5 +57,15 @@ for dataset in berlinmod worldtrace geolife; do
         spark-submit --class gr.ds.unipi.spatialnodb.queries.frequet.counts.Frechet2DQueriesDirectoriesIntervalsMBRVar3 --master yarn --deploy-mode client --jars './lib/*' --conf spark.yarn.archive="hdfs://node13:9000/user/trajparquet-jars.tar.gz" --executor-memory 4608m --executor-cores 2 --driver-memory 5g --num-executors 12 --conf spark.network.timeout=600s --conf "spark.executor.extraJavaOptions=-Xms4608m" --conf "spark.driver.extraJavaOptions=-Xms5g -Dconfig.file=queries-frechet-${dataset}.conf -Ddata-loading.hilbert.bits=$bits -Ddataset=$dataset -Dqueriesfilename=trajectories -Depsilon=${epsilon} -Dmethod=frequet" ./Frequet-1.0-SNAPSHOT.jar 72
         spark-submit --class gr.ds.unipi.spatialnodb.queries.frequet.counts.Frechet2DQueriesDirectoriesIntervalsPivotsVar2 --master yarn --deploy-mode client --jars './lib/*' --conf spark.yarn.archive="hdfs://node13:9000/user/trajparquet-jars.tar.gz" --executor-memory 4608m --executor-cores 2 --driver-memory 5g --num-executors 12 --conf spark.network.timeout=600s --conf "spark.executor.extraJavaOptions=-Xms4608m" --conf "spark.driver.extraJavaOptions=-Xms5g -Dconfig.file=queries-frechet-${dataset}.conf -Ddata-loading.hilbert.bits=$bits -Ddataset=$dataset -Dqueriesfilename=trajectories -Depsilon=${epsilon} -Dmethod=frequet" ./Frequet-1.0-SNAPSHOT.jar 72
         spark-submit --class gr.ds.unipi.spatialnodb.queries.frequet.counts.Frechet2DQueriesDirectoriesIntervalsPivotsVar3 --master yarn --deploy-mode client --jars './lib/*' --conf spark.yarn.archive="hdfs://node13:9000/user/trajparquet-jars.tar.gz" --executor-memory 4608m --executor-cores 2 --driver-memory 5g --num-executors 12 --conf spark.network.timeout=600s --conf "spark.executor.extraJavaOptions=-Xms4608m" --conf "spark.driver.extraJavaOptions=-Xms5g -Dconfig.file=queries-frechet-${dataset}.conf -Ddata-loading.hilbert.bits=$bits -Ddataset=$dataset -Dqueriesfilename=trajectories -Depsilon=${epsilon} -Dmethod=frequet" ./Frequet-1.0-SNAPSHOT.jar 72
+    done
+done
+
+
+TOP-K
+for k in $(seq 5 5); do
+    for dataset in berlinmod geolife worldtrace; do
+        for bits in $(seq 3 7); do
+            spark-submit --class gr.ds.unipi.spatialnodb.queries.frequet.Knn2DQueriesDirectoriesOptimizedNew --master yarn --deploy-mode client --jars './lib/*' --conf spark.yarn.archive="hdfs://node13:9000/user/trajparquet-jars.tar.gz" --executor-memory 4608m --executor-cores 2 --driver-memory 5g --num-executors 12 --conf spark.network.timeout=600s --conf "spark.executor.extraJavaOptions=-Xms4608m" --conf "spark.driver.extraJavaOptions=-Xms5g -Dconfig.file=queries-frechet-${dataset}.conf -Ddata-loading.hilbert.bits=$bits -Ddataset=$dataset -Dqueriesfilename=trajectories -Dk=${k} -Dmethod=frequet" ./Frequet-1.0-SNAPSHOT.jar 72
+        done
     done
 done

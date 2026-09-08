@@ -102,8 +102,6 @@ public class Knn2DQueriesDirectoriesOptimizedNew {
             }
         }
 
-//        List<Long> times = new ArrayList<>();
-//        List<Integer> pages = new ArrayList<>();
         int issuedQueriesTracklets = 0;
         int issuedQueriesFrechetComputation = 0;
 
@@ -242,10 +240,12 @@ public class Knn2DQueriesDirectoriesOptimizedNew {
 
             while((trajectoryQueue.getSize() < k || queueCells.peek().getScore() < trajectoryQueue.getMaxScore()) && !queueCells.isEmpty()) {
                 sb.setLength(0);
-                int z = visitedCubes.size();
+                int z = 8;//visitedCubes.size();
                 while(z>0) {
-                    long cell = queueCells.poll().getCellId();
-                    visitedCubes.add(cell);
+                    CellScore cellScore = queueCells.poll();
+                    if(cellScore!=null) {
+                        long cell = cellScore.getCellId();
+                        visitedCubes.add(cell);
                         long[] cube = hilbertCurve.point(cell);
                         for (long i = Math.max(0, cube[0] - 1); i <= Math.min(maxOrdinates, cube[0] + 1); i++) {
                             for (long j = Math.max(0, cube[1] - 1); j <= Math.min(maxOrdinates, cube[1] + 1); j++) {
@@ -262,6 +262,9 @@ public class Knn2DQueriesDirectoriesOptimizedNew {
                             sb.append(parquetPath + File.separator + "stIndex" + File.separator + j + "/,");
                             z--;
                         }
+                    }else{
+                        break;
+                    }
                 }
 
                 if(sb.length()!=0){
@@ -285,8 +288,8 @@ public class Knn2DQueriesDirectoriesOptimizedNew {
                         });
 
                         List<TrajectorySegmentWithMetadata> segmentList = identifiedTrajSegments.get(seg.getTrajectorySegment().getObjectId());
-                        if(isFull(segmentList) && trajectoryQueue.getSize()==k){
-                            if(!canBePruned(segmentList,trajectoryQuery,trajectoryQueue.getMaxScore())){
+                        if(isFull(segmentList)) {
+                            if (trajectoryQueue.getSize() < k || !canBePruned(segmentList, trajectoryQuery, trajectoryQueue.getMaxScore())) {
                                 flushedTrajectories.add(Binary.fromString(seg.getTrajectorySegment().getObjectId()));
                             }
                             identifiedTrajSegments.remove(seg.getTrajectorySegment().getObjectId());
@@ -309,9 +312,8 @@ public class Knn2DQueriesDirectoriesOptimizedNew {
                     }
                 }
             }
-
-            System.out.println("The max score is:"+trajectoryQueue.getMaxScore() +"examined trajectoreies are"+queriedTrajectoriesCounter);
-            System.out.println(checked);
+//            System.out.println("The max score is:"+trajectoryQueue.getMaxScore() +"examined trajectoreies are"+queriedTrajectoriesCounter);
+//            System.out.println(checked);
 //            long num =trajectoryQueue.getSize();// trajs.size();
 
             long endTime = System.currentTimeMillis();
@@ -337,6 +339,19 @@ public class Knn2DQueriesDirectoriesOptimizedNew {
 
         sparkSession.close();
 
+
+        br = new BufferedReader(new FileReader(fullPathExportedFile));
+        List<Integer> queryEndJobs = new ArrayList<>();
+        br.readLine();
+        String line;
+        while ((line = br.readLine()) != null) {
+            String[] values = line.split("\t");
+            int n = values.length;
+            int previous = Integer.parseInt(values[n - 3]);
+            int beforePrevious = Integer.parseInt(values[n - 2]);
+            queryEndJobs.add(beforePrevious+previous);
+        }
+
         if(sparkConf.getBoolean("spark.eventLog.enabled",false)){
             String eventLogDir = sparkConf.get("spark.eventLog.dir");
             File dir = new File(eventLogDir.replace("file:", ""));
@@ -348,7 +363,7 @@ public class Knn2DQueriesDirectoriesOptimizedNew {
                             .orElseThrow(() -> new IllegalStateException(
                                     "No event log file found for application " + applicationId));
 
-            List<Long>[] lists = SparkLogParser.getMetricsPerJob(eventLogFile.getAbsolutePath());
+            List<Long>[] lists = SparkLogParser.getMetricsPerJob(eventLogFile.getAbsolutePath(),queryEndJobs);
             try {
                 SparkLogParser.enrichQueryAdHocFileWithMetrics(fullPathExportedFile, lists);
             }catch (Exception e) {
