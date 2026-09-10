@@ -23,10 +23,7 @@ import org.davidmoten.hilbert.SmallHilbertCurve;
 
 import java.io.*;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 import static gr.ds.unipi.spatialnodb.AppConfig.loadConfig;
 
@@ -62,7 +59,7 @@ public class KnnQueriesDirectoriesBruteForce {
         SparkConf sparkConf = new SparkConf().registerKryoClasses(new Class[]{SpatioTemporalPoint.class,SpatioTemporalPoint[].class});
         sparkConf.setAppName("Knn Querying (Brute force) in TrajParquet");
         if (!sparkConf.contains("spark.master")) {
-            sparkConf.setMaster("local[*]").set("spark.executor.memory","4g") .set("spark.kryoserializer.buffer.max", "1g");
+            sparkConf.setMaster("local[*]").set("spark.executor.memory","4g") .set("spark.kryoserializer.buffer.max", "1g") .set("spark.driver.maxResultSize", "5g");
         }
         SparkSession sparkSession = SparkSession.builder().config(sparkConf).getOrCreate();
         JavaSparkContext jsc = JavaSparkContext.fromSparkContext(sparkSession.sparkContext());
@@ -159,11 +156,14 @@ public class KnnQueriesDirectoriesBruteForce {
 
 
             trajectoryQueue.getMaxHeap().forEach(d->{
-                System.out.println("object id:"+d.getTrajectorySegment().getObjectId()+" score:"+d.getScore());
+                System.out.println("object id:"+d.getTrajectorySegment().getObjectId()+" score:"+d.getScore()+" "+ Arrays.toString(d.getTrajectorySegment().getSpatialPoints()));
             });
 
             System.out.println(trajectoryQueue.getMaxScore());
+            bw.write(trajectoryQueue.getMaxScore()+"");
+            bw.newLine();
         }
+        bw.close();
     }
 
 //    private static void flush(HashMap<String, List<TrajectorySegment>> identifiedTrajectories, HashSet<String> flushedtrajectories){

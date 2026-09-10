@@ -228,7 +228,7 @@ public class DataLoading {
                         }
                 ).collectAsMap();
 
-        codeShapes.forEach((k,v)->{System.out.println(k +" "+v);});
+//        codeShapes.forEach((k,v)->{System.out.println(k +" "+v);});
 
         Path outputPath = new Path(writePath + "/cache.ser");
 
@@ -313,7 +313,7 @@ public class DataLoading {
             }
         }
 
-        try(BufferedWriter bf = new BufferedWriter(new FileWriter(metricsPathExport+File.separator+"data-loading-trajparquetDirectoriesWithWholeTrajectories-"+Paths.get(writePath).getFileName().toString()+".txt"))) {
+        try(BufferedWriter bf = new BufferedWriter(new FileWriter(metricsPathExport+File.separator+"data-loading-"+Paths.get(writePath).getFileName().toString()+".txt"))) {
             bf.write("Write Time");
             bf.newLine();
             bf.write(String.valueOf((endTime - startTime)/1000));

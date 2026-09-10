@@ -299,7 +299,6 @@ public class DataLoading {
                 newTrjSeg = new Tuple2<>(trjSeg._1, new VRERecordWithKey(trjSeg._1, new VRERecord(trjSeg._2.getRecord().getObjectId(), trjSeg._2.getRecord().getSerialNumber(), 2, trjSeg._2.getRecord().getSpatialPoints(), trjSeg._2.getRecord().getMinLongitude(), trjSeg._2.getRecord().getMinLatitude(), trjSeg._2.getRecord().getMaxLongitude(), trjSeg._2.getRecord().getMaxLatitude(), trjSeg._2.getRecord().getFirstPoint(), trjSeg._2.getRecord().getLastPoint(), trjSeg._2.getRecord().getSignature())));
                 trajectoryParts.set(trajectoryParts.size()-1, newTrjSeg);
             }
-
             return trajectoryParts.iterator();
 
         }).mapToPair((t)->{return Tuple2.apply(new VREKeySerialNumber(t._1, t._2.getRecord().getSerialNumber()),t._2);}).sortByKey().<Void, VRERecordWithKey>mapToPair(f->Tuple2.apply(null, f._2));
@@ -404,7 +403,7 @@ public class DataLoading {
             }
         }
 
-        try(BufferedWriter bf = new BufferedWriter(new FileWriter(metricsPathExport+File.separator+"data-loading-trajparquetDirectoriesWithWholeTrajectories-"+Paths.get(writePath).getFileName().toString()+".txt"))) {
+        try(BufferedWriter bf = new BufferedWriter(new FileWriter(metricsPathExport+File.separator+"data-loading-"+Paths.get(writePath).getFileName().toString()+".txt"))) {
             bf.write("Write Time");
             bf.newLine();
             bf.write(String.valueOf((endTime - startTime)/1000));

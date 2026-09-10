@@ -104,6 +104,8 @@ public class VRERecord implements Serializable {
         return "TrajectorySegment{" +
                 "objectId='" + objectId + '\'' +
                 ", spatioTemporalPoints=" + Arrays.toString(spatialPoints) +
+                ", serialNumber=" + serialNumber +
+                ", segmentType=" + segmentType +
                 ", minLongitude=" + minLongitude +
                 ", minLatitude=" + minLatitude +
                 ", maxLongitude=" + maxLongitude +

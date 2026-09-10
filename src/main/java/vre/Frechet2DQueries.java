@@ -155,12 +155,11 @@ public class Frechet2DQueries {
             double[] qMbr = new double[]{mbrMinLongitude, mbrMinLatitude, mbrMaxLongitude, mbrMaxLatitude};
             byte[] querySignature = signatureCoder.signature(trajectoryQuery, mbrMinLongitude, mbrMinLatitude, mbrMaxLongitude, mbrMaxLatitude);
 
-            List<long[]> ranges = cfg.queryRanges(Math.max(mbrMinLongitude-epsilon,minLon+0.0000001), Math.max(mbrMinLatitude-epsilon,minLat+0.0000001), Math.min(mbrMaxLongitude+epsilon,maxLon-0.0000001), Math.min(mbrMaxLatitude+epsilon,maxLat-0.0000001),1000);
+            List<long[]> ranges = cfg.queryRanges(Math.max(mbrMinLongitude-epsilon,minLon+0.0000001), Math.max(mbrMinLatitude-epsilon,minLat+0.0000001), Math.min(mbrMaxLongitude+epsilon,maxLon-0.0000001), Math.min(mbrMaxLatitude+epsilon,maxLat-0.0000001),500);
             long parseAndCubeIndex = System.currentTimeMillis() - startTime;
 
             Set<Long> singles = new HashSet<Long>();
             FilterPredicate keyPred = null;
-
 
             for (long[] r : ranges) {
                 if (r[1] - r[0] == 1L) {
@@ -190,11 +189,11 @@ public class Frechet2DQueries {
                         }
                         List<VRERecord> records = new ArrayList<>(count);
                         f._2.forEach(records::add);
-                        records.sort(Comparator.comparingLong(VRERecord::getSerialNumber));
+                        records.sort(Comparator.comparingInt(VRERecord::getSerialNumber));
 
                         if(!isFull(records)){return Tuple2.apply(false, f._1);}
 
-                        if(pruneByLowerBound(trajectoryQuery,qMbr,querySignature,records, m, n, epsilon)){return Tuple2.apply(false, f._1);}
+                        if(pruneByLowerBound(trajectoryQuery,qMbr, querySignature,records, m, n, epsilon)){return Tuple2.apply(false, f._1);}
 
                         return Tuple2.apply(true, f._1);
                     }).filter(f->f._1).map(f->f._2).collect();
@@ -270,8 +269,13 @@ public class Frechet2DQueries {
         br = new BufferedReader(new FileReader(fullPathExportedFile));
         List<Integer> queryEndJobs = new ArrayList<>();
         br.readLine();
-        while (br.readLine() != null) {
-            queryEndJobs.add(2);
+        String line;
+        while ((line = br.readLine()) != null) {
+            if(line.contains("true")){
+                queryEndJobs.add(2);
+            }else{
+                queryEndJobs.add(1);
+            }
         }
 
         if(sparkConf.getBoolean("spark.eventLog.enabled",false)){
@@ -285,10 +289,10 @@ public class Frechet2DQueries {
                             .orElseThrow(() -> new IllegalStateException(
                                     "No event log file found for application " + applicationId));
 
-            List<Long>[] stages = SparkLogParser.getTimeStages(eventLogFile.getAbsolutePath(), 2);
+//            List<Long>[] stages = SparkLogParser.getTimeStages(eventLogFile.getAbsolutePath(), 2);
             List<Long>[] lists = SparkLogParser.getMetricsPerNJobs(eventLogFile.getAbsolutePath(), queryEndJobs);
             try {
-                SparkLogParser.enrichQueryAdHocFileWithStagesAndMetricsCondition(fullPathExportedFile, stages, lists);
+                SparkLogParser.enrichQueryAdHocFileWithMetrics(fullPathExportedFile, lists);
             }catch (Exception e) {
                 e.printStackTrace();
             }

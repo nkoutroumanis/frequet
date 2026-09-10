@@ -201,60 +201,46 @@ public class KnnQueries {
             Set<String> verified = new HashSet<String>();
             Set<String> pruned = new HashSet<String>();
 
-            // C_t: objectId -> segments of that trajectory collected so far, across
-            // ALL cell/batch iterations (Alg.1 line 2). A trajectory is verified
-            // only when its buffer reaches segNum segments or it becomes complete.
             Map<String, List<VRERecord>> ct = new HashMap<String, List<VRERecord>>();
-
-            // Seed mbrq with the root cell (whole domain).
             Set<String> seen = new HashSet<String>();
             seedAllLevelsDistanceZero(mbrq, seen, index, minLon, minLat, maxLon, maxLat, qXmin, qYmin, qXmax, qYmax, trajectoryQuery);
 //            mbrq.add(new CellEntry(new int[0], minLon, minLat, maxLon, maxLat, minDistToRect(minLon, minLat, maxLon, maxLat, trajectoryQuery)));
-//            seedAllLevelsDistanceZero(mbrq, index, minLon, minLat, maxLon, maxLat,
+//            int[] rootSeq = new int[0];
+//            seen.add(Arrays.toString(rootSeq));
+
+            //            seedAllLevelsDistanceZero(mbrq, index, minLon, minLat, maxLon, maxLat,
 //                    qXmin, qYmin, qXmax, qYmax, trajectoryQuery);
             while (!mbrq.isEmpty()) {
-                // Termination: k found and the closest remaining cell is already
-                // >= epsilon, so nothing remaining can be closer.
                 if (result.size() >= k && mbrq.peek().minDist >= epsilon) {
                     break;
                 }
 
-                // ---- drain all cells at the same (closest) distance -------------
-                // This is the analogue of IQ's equal-distance batching: every cell
-                // sharing the frontier distance d0 is processed together, so their
-                // region queries coalesce into ONE store round-trip.
                 double d0 = mbrq.peek().minDist;
                 List<CellEntry> batch = new ArrayList<CellEntry>();
                 while (!mbrq.isEmpty() && Double.compare(mbrq.peek().minDist, d0) == 0) {
                     CellEntry e = mbrq.poll();
-
-                    // Containment prune (TraSS): the enlarged element (doubled
-                    // toward upper-right) dilated by epsilon must contain the query
-                    // envelope, else this cell cannot yield a closer result.
-                    // Monotone in epsilon => sound to drop the whole cell (and its
-                    // subtree, since we simply don't expand it).
-                    if (result.size() >= k && epsilon != Double.POSITIVE_INFINITY) {
-                        double xLen = e.x1 - e.x0, yLen = e.y1 - e.y0;
-                        double ex0 = e.x0 - epsilon, ey0 = e.y0 - epsilon;
-                        double ex1 = (e.x1 + xLen) + epsilon, ey1 = (e.y1 + yLen) + epsilon;
-                        boolean keep = ex0 <= qXmin && ey0 <= qYmin
-                                && ex1 >= qXmax && ey1 >= qYmax;
-                        if (!keep) {
-                            continue;
-                        }
-                    }
                     batch.add(e);
                 }
+//                while (!mbrq.isEmpty() && Double.compare(mbrq.peek().minDist, d0) == 0) {
+//                    CellEntry e = mbrq.poll();
+//                    if (result.size() >= k && epsilon != Double.POSITIVE_INFINITY) {
+//                        double xLen = e.x1 - e.x0, yLen = e.y1 - e.y0;
+//                        double ex0 = e.x0 - epsilon, ey0 = e.y0 - epsilon;
+//                        double ex1 = (e.x1 + xLen) + epsilon, ey1 = (e.y1 + yLen) + epsilon;
+//                        boolean keep = ex0 <= qXmin && ey0 <= qYmin
+//                                && ex1 >= qXmax && ey1 >= qYmax;
+//                        if (!keep) {
+//                            continue;
+//                        }
+//                    }
+//                    batch.add(e);
+//                }
                 if (batch.isEmpty()) {
                     continue;
                 }
 
-                // ---- one batched store query for the whole equal-distance group -
+                //one batched store query for the whole equal-distance group
                 Set<Long> codes = new HashSet<>(batch.size());
-//                for (int i = 0; i < batch.size(); i++) {
-//                    CellEntry e = batch.get(i);
-//                    codes.add(index.quadrantCode(e.seq));
-//                }
                 for (int i = 0; i < batch.size(); i++) {
                     CellEntry e = batch.get(i);
                     long code = index.quadrantCode(e.seq);
@@ -266,14 +252,7 @@ public class KnnQueries {
                     ParquetInputFormat.setFilterPredicate(jobMeta.getConfiguration(), in(longColumn("key"), codes));
                     JavaPairRDD<Void, VRERecord> candidates = (JavaPairRDD<Void, VRERecord>) jsc.newAPIHadoopFile(parquetPath + File.separator + "sIndex", ParquetInputFormat.class, Void.class, VRERecord.class, jobMeta.getConfiguration());
                     List<VRERecord> cands = candidates.map(f -> f._2).collect();
-//                  System.out.println(cands.size() +" "+ codes.size());
                     metadataRounds++;
-                //List<VRERecord> cands = store.segmentsInCells(codes, cellMbrs);
-
-                // Accumulate returned segments; prune PER EXAMINED SEGMENT (not per accumulated
-                // group). Each candidate segment is checked on its own: if the single-segment
-                // lower bound reaches epsilon, the whole trajectory is pruned (added to `pruned`
-                // so it is not revisited).
 
                     for (VRERecord rec : cands) {
                         String oid = rec.getObjectId();
@@ -289,9 +268,6 @@ public class KnnQueries {
                         }
                         group.add(rec);
 
-                        // GROUP prune: check the bound over ALL accumulated segments of
-                        // this trajectory, not just the one just received. If any segment's
-                        // lower bound reaches epsilon, prune the whole trajectory.
                         boolean isFull = isFull(group);
                         if (result.size() >= k) {
                             boolean prune = false;
@@ -306,8 +282,15 @@ public class KnnQueries {
                             }
                         }
 
-                        // Verification trigger (Alg.1 line 15): enough segments buffered or complete.
-                        if (group.size() >= segNum || isFull) {
+//                        if(group.get(0).getObjectId().equals("197387") && (group.size()==2)){
+//                            System.out.println(group.size());
+//                            System.out.println(group.size() >= segNum);
+//                            System.out.println(isFull);
+//                            group.forEach(s-> System.out.println(s));
+//                            System.exit(12);
+//                        }
+
+                        if (/*group.size() >= segNum || */isFull) {
                             ParquetInputFormat.setFilterPredicate(jobSegmentPoints.getConfiguration(), eq(binaryColumn("objectId"), Binary.fromString(oid)));
                             JavaPairRDD<Void, VRERecord> wholeSegments = (JavaPairRDD<Void, VRERecord>) jsc.newAPIHadoopFile(parquetPath + File.separator + "sIndex", ParquetInputFormat.class, Void.class, VRERecord.class, jobSegmentPoints.getConfiguration());
                             JavaPairRDD<Double, VRERecord> results = (JavaPairRDD<Double, VRERecord>) wholeSegments.mapToPair(f -> Tuple2.apply(f._2.getObjectId(), f._2)).groupByKey(Integer.parseInt(args[0])).map(f -> {
@@ -332,8 +315,6 @@ public class KnnQueries {
                                     result.add(new Result(oid, tuple2._2.getSpatialPoints(), tuple2._1));
                                 }
                             }
-                            // Tighten epsilon immediately so the REST of this batch's
-                            // candidates are pruned against the updated k-th distance.
                             if (result.size() >= k) {
                                 epsilon = result.peek().distance;
                             }
@@ -363,85 +344,14 @@ public class KnnQueries {
                         }
                     }
                 }
-//                for (CellEntry e : batch) {
-//                    if (e.seq.length < index.g) {
-//                        for (int q = 0; q < 4; q++) {
-//                            double[] cb = childBounds(e.x0, e.y0, e.x1, e.y1, q);
-//                            int[] cs = new int[e.seq.length + 1];
-//                            System.arraycopy(e.seq, 0, cs, 0, e.seq.length);
-//                            cs[e.seq.length] = q;
-//                            double mdee = minDistToRect(cb[0], cb[1], cb[2], cb[3], trajectoryQuery);
-//                            mbrq.add(new CellEntry(cs, cb[0], cb[1], cb[2], cb[3], mdee));
-//                        }
-//                    }
-//                }
             }
-
-            // ---- post-loop sweep: rescue promising stragglers -------------------
-            // With segNum > 1 the main loop can terminate (line 5) while a true
-            // top-k trajectory is still buffered in C_t having reached neither
-            // segNum segments nor isFull. Any such object whose admissible lower
-            // bound is below epsilon must still be verified, or it would be a
-            // silently-missed result. (With segNum == 1 nothing is ever left here.)
-//            for (Map.Entry<String, List<VRERecord>> en : ct.entrySet()) {
-//                String oid = en.getKey();
-//                if (verified.contains(oid)) {
-//                    continue;
-//                }
-//                List<VRERecord> group = en.getValue();
-//
-//                if (result.size() >= k) {
-//                    boolean prune = false;
-//                    for (VRERecord seg : group) {
-//                        if (pruneByLowerBound(trajectoryQuery, qPivots, qMbr, querySignature, seg, m, n, epsilon)) {
-//                            prune = true;
-//                            break;
-//                        }
-//                    }
-//                    if (prune) {
-//                        continue; // provably cannot enter top-k
-//                    }
-//                }
-//
-//                ParquetInputFormat.setFilterPredicate(jobSegmentPoints.getConfiguration(), eq(binaryColumn("objectId"), Binary.fromString(oid)));
-//                JavaPairRDD<Void, VRERecord> wholeSegments = (JavaPairRDD<Void, VRERecord>) jsc.newAPIHadoopFile(parquetPath + File.separator + "sIndex", ParquetInputFormat.class, Void.class, VRERecord.class, jobSegmentPoints.getConfiguration());
-//                JavaPairRDD<Double, VRERecord> results = (JavaPairRDD<Double, VRERecord>) wholeSegments.mapToPair(f-> Tuple2.apply(f._2.getObjectId(), f._2)).groupByKey(Integer.parseInt(args[0])).map(f->{
-//                    int count = 0;
-//                    for (VRERecord vreRecord : f._2) {
-//                        count++;
-//                    }
-//                    List<VRERecord> records = new ArrayList<>(count);
-//                    f._2.forEach(records::add);
-//                    records.sort(Comparator.comparingLong(VRERecord::getSerialNumber));
-//
-//                    return new VRERecord(f._1, records);
-//                }).mapToPair(f -> Tuple2.apply(HilbertUtil.frechetDistance(trajectoryQuery, f.getSpatialPoints()), f));//.filter(f -> f._1 <= finalEpsilon);
-//
-//                for (Tuple2<Double, VRERecord> tuple2 : results.collect()) {
-//                    verified.add(oid);
-//                    ct.remove(oid);
-//                    if (result.size() < k) {
-//                        result.add(new Result(oid, tuple2._2.getSpatialPoints(), tuple2._1));
-//                    } else if (tuple2._1 < result.peek().distance) {
-//                        result.poll();
-//                        result.add(new Result(oid, tuple2._2.getSpatialPoints(), tuple2._1));
-//                    }
-//                }
-//            }
-
-//            List<Result> out = new ArrayList<Result>(result);
-//            out.sort(new Comparator<Result>() {
-//                @Override public int compare(Result a, Result b) {
-//                    return Double.compare(a.distance, b.distance);
-//                }
-//            });
 
 //            for (Result result1 : result) {
 //                System.out.println(result1.distance);
 //                System.out.println(result1.objectId+" "+Arrays.toString(result1.trajectory));
 //
 //            }
-//            System.out.println(verified.size());
+            //            System.out.println(verified.size());
 //            System.out.println(epsilons);
 //            System.out.println(res);
 //            System.out.println(metadataRounds);
@@ -753,8 +663,6 @@ public class KnnQueries {
                     }
                 }
             }
-            // non-intersecting cells are NOT seeded here — they enter the queue via
-            // the normal child-expansion of the seeded distance-0 cells during the search.
         }
     }
 

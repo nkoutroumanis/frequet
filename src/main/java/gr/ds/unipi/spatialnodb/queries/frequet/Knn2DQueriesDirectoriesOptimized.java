@@ -275,11 +275,20 @@ public class Knn2DQueriesDirectoriesOptimized {
                                 if (HilbertUtil.euclideanDistance(seg.getPivots()[0].getLongitude(), seg.getPivots()[0].getLatitude(), trajectoryQuery[0].getLongitude(), trajectoryQuery[0].getLatitude()) > trajectoryQueue.getMaxScore()) {
                                     return true;
                                 }
-                            }else{
+                            }else if(seg.getInterval()[1]<0){
                                 if (HilbertUtil.euclideanDistance(seg.getPivots()[seg.getPivots().length - 2].getLongitude(), seg.getPivots()[seg.getPivots().length - 2].getLatitude(), trajectoryQuery[0].getLongitude(), trajectoryQuery[0].getLatitude()) > trajectoryQueue.getMaxScore()) {
                                     return true;
                                 }
+                            }else{
+                                if (HilbertUtil.euclideanDistance(seg.getPivots()[seg.getPivots().length - 1].getLongitude(), seg.getPivots()[seg.getPivots().length - 1].getLatitude(), trajectoryQuery[0].getLongitude(), trajectoryQuery[0].getLatitude()) > trajectoryQueue.getMaxScore()) {
+                                    return true;
+                                }
                             }
+//                            else{
+//                                if (HilbertUtil.euclideanDistance(seg.getPivots()[seg.getPivots().length - 2].getLongitude(), seg.getPivots()[seg.getPivots().length - 2].getLatitude(), trajectoryQuery[0].getLongitude(), trajectoryQuery[0].getLatitude()) > trajectoryQueue.getMaxScore()) {
+//                                    return true;
+//                                }
+//                            }
                         }
                         if(seg.getInterval()[1]<0){
                             if(HilbertUtil.euclideanDistance(seg.getPivots()[seg.getPivots().length-1].getLongitude(),seg.getPivots()[seg.getPivots().length-1].getLatitude(),trajectoryQuery[trajectoryQuery.length-1].getLongitude(),trajectoryQuery[trajectoryQuery.length-1].getLatitude())>trajectoryQueue.getMaxScore()){
@@ -363,8 +372,12 @@ public class Knn2DQueriesDirectoriesOptimized {
                                      if (HilbertUtil.euclideanDistance(seg.getPivots()[0].getLongitude(), seg.getPivots()[0].getLatitude(), trajectoryQuery[0].getLongitude(), trajectoryQuery[0].getLatitude()) > l) {
                                          return false;
                                      }
-                                 }else{
+                                 }else if(seg.getInterval()[1]<0){
                                      if (HilbertUtil.euclideanDistance(seg.getPivots()[seg.getPivots().length - 2].getLongitude(), seg.getPivots()[seg.getPivots().length - 2].getLatitude(), trajectoryQuery[0].getLongitude(), trajectoryQuery[0].getLatitude()) > l) {
+                                         return false;
+                                     }
+                                 }else{
+                                     if (HilbertUtil.euclideanDistance(seg.getPivots()[seg.getPivots().length - 1].getLongitude(), seg.getPivots()[seg.getPivots().length - 1].getLatitude(), trajectoryQuery[0].getLongitude(), trajectoryQuery[0].getLatitude()) > l) {
                                          return false;
                                      }
                                  }

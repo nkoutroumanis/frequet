@@ -312,6 +312,10 @@ public class Knn2DQueriesDirectoriesOptimizedNew {
                     }
                 }
             }
+//            for (TrajectoryScore trajectoryScore : trajectoryQueue.getMaxHeap()) {
+//                System.out.println(trajectoryScore.getTrajectorySegment().getObjectId()+" "+trajectoryScore.getScore());
+//            }
+
 //            System.out.println("The max score is:"+trajectoryQueue.getMaxScore() +"examined trajectoreies are"+queriedTrajectoriesCounter);
 //            System.out.println(checked);
 //            long num =trajectoryQueue.getSize();// trajs.size();
@@ -379,7 +383,6 @@ public class Knn2DQueriesDirectoriesOptimizedNew {
                 flushedtrajectories.add(Binary.fromString(e.getValue().get(0).getTrajectorySegment().getObjectId()));
                 return true;
             }else if(e.getValue().get(0).getInterval()[0]==1 && e.getValue().get(e.getValue().size()-1).getInterval()[1]<1){
-
                 long y = e.getValue().get(0).getInterval()[1];
                 for (int i = 1; i < e.getValue().size()-1; i++) {
                     if(y+1 != e.getValue().get(i).getInterval()[0]) {return false;}
@@ -418,8 +421,12 @@ public class Knn2DQueriesDirectoriesOptimizedNew {
                 if (HilbertUtil.euclideanDistance(startSegment.getPivots()[0].getLongitude(), startSegment.getPivots()[0].getLatitude(), trajectoryQuery[0].getLongitude(), trajectoryQuery[0].getLatitude()) > l) {
                     return true;
                 }
-            }else{
+            }else if(startSegment.getInterval()[1]<0){
                 if (HilbertUtil.euclideanDistance(startSegment.getPivots()[startSegment.getPivots().length - 2].getLongitude(), startSegment.getPivots()[startSegment.getPivots().length - 2].getLatitude(), trajectoryQuery[0].getLongitude(), trajectoryQuery[0].getLatitude()) > l) {
+                    return true;
+                }
+            }else{
+                if (HilbertUtil.euclideanDistance(startSegment.getPivots()[startSegment.getPivots().length - 1].getLongitude(), startSegment.getPivots()[startSegment.getPivots().length - 1].getLatitude(), trajectoryQuery[0].getLongitude(), trajectoryQuery[0].getLatitude()) > l) {
                     return true;
                 }
             }
