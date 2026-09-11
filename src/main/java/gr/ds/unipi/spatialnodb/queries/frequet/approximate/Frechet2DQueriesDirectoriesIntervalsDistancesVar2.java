@@ -215,7 +215,7 @@ public class Frechet2DQueriesDirectoriesIntervalsDistancesVar2 {
 //        System.exit(7);
 
 
-        String fullPathExportedFile = metricsPath+ File.separator+"frechet-queries-approximate-distances-var2-"+Paths.get(parquetPath).getFileName().toString()+"-"+ Paths.get(queriesFilePath).getFileName().toString().replaceFirst("\\.[^.]+$", "")+".txt";
+        String fullPathExportedFile = metricsPath+ File.separator+"frechet-"+epsilon+"-"+"approximate-distances-var2-"+Paths.get(parquetPath).getFileName().toString()+"-"+ Paths.get(queriesFilePath).getFileName().toString().replaceFirst("\\.[^.]+$", "")+".txt";
         BufferedWriter bw = new BufferedWriter(new FileWriter(fullPathExportedFile));
         BufferedReader br = new BufferedReader(new FileReader(queriesFilePath));
         bw.write("Time Exec\tQuery Points\tNum of Trajectories\tNum of Points\tIssued\tData Pages\tIntersected Cubes\tParse\n");

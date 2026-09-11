@@ -84,7 +84,7 @@ public class KnnQueriesDirectoriesBruteForce {
 
         List<Long> times = new ArrayList<>();
 
-        BufferedWriter bw = new BufferedWriter(new FileWriter(pathExport+ File.separator+"knn-queries-bruteForce-frequet-"+ Paths.get(queriesFilePath).getFileName().toString().replaceFirst("\\.[^.]+$", "")+"-"+Paths.get(parquetPath).getFileName().toString()+".txt"));
+        BufferedWriter bw = new BufferedWriter(new FileWriter(pathExport+ File.separator+"knn-"+k+"-bruteForce-frequet-"+ Paths.get(queriesFilePath).getFileName().toString().replaceFirst("\\.[^.]+$", "")+"-"+Paths.get(parquetPath).getFileName().toString()+".txt"));
         BufferedReader br = new BufferedReader(new FileReader(queriesFilePath));
         String query;
         while ((query = br.readLine()) != null) {

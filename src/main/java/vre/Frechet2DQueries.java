@@ -85,7 +85,7 @@ public class Frechet2DQueries {
         XZ2Coder cfg = new XZ2Coder(maxResolution, minLon, maxLon, minLat, maxLat);
         SignatureCoder signatureCoder = new SignatureCoder(m, n);
 
-        String fullPathExportedFile = metricsPath+ File.separator+"frechet-queries-"+Paths.get(parquetPath).getFileName().toString()+"-"+ Paths.get(queriesFilePath).getFileName().toString().replaceFirst("\\.[^.]+$", "")+".txt";
+        String fullPathExportedFile = metricsPath+ File.separator+"frechet-"+epsilon+"-"+""+Paths.get(parquetPath).getFileName().toString()+"-"+ Paths.get(queriesFilePath).getFileName().toString().replaceFirst("\\.[^.]+$", "")+".txt";
         BufferedWriter bw = new BufferedWriter(new FileWriter(fullPathExportedFile));
         BufferedReader br = new BufferedReader(new FileReader(queriesFilePath));
         bw.write("Time Exec\tQuery Points\tNum of Trajectories\tNum of Points\tIssued\tData Pages\tIntersected Spaces\tParse\n");

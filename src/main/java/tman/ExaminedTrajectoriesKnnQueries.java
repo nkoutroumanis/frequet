@@ -104,7 +104,7 @@ public class ExaminedTrajectoriesKnnQueries {
 
         InMemorySignatureCache cache = InMemorySignatureCache.fromMap(codeShapes, cfg);
 
-        String fullPathExportedFile = metricsPath+ File.separator+"knn-"+k+"-queries-"+Paths.get(parquetPath).getFileName().toString()+"-"+ Paths.get(queriesFilePath).getFileName().toString().replaceFirst("\\.[^.]+$", "")+".txt";
+        String fullPathExportedFile = metricsPath+ File.separator+"knn-"+k+"-"+"examined-"+Paths.get(parquetPath).getFileName().toString()+"-"+ Paths.get(queriesFilePath).getFileName().toString().replaceFirst("\\.[^.]+$", "")+".txt";
         BufferedWriter bw = new BufferedWriter(new FileWriter(fullPathExportedFile));
         BufferedReader br = new BufferedReader(new FileReader(queriesFilePath));
         bw.write("Time Exec\tQuery Points\tNum of Trajectories\tk-th Distance\tNum of Points\tData Pages\tParse\tQuery rounds\tChecked Trajectories\n");
@@ -316,7 +316,7 @@ public class ExaminedTrajectoriesKnnQueries {
                 numOfPoints = numOfPoints + voidTrajectoryTuple2.tmanRecord.getSpatialPoints().length;
             }
 
-            bw.write((endTime - startTime)+"\t"+trajectoryQuery.length+"\t"+result.size()+"\t"+result.peek().distance+"\t"+numOfPoints+"\t"+DataPage.counter+"\t"+parseAndCubeIndex+"\t"+rounds+"'\t"+checkedTrajectories);
+            bw.write((endTime - startTime)+"\t"+trajectoryQuery.length+"\t"+result.size()+"\t"+result.peek().distance+"\t"+numOfPoints+"\t"+DataPage.counter+"\t"+parseAndCubeIndex+"\t"+rounds+"\t"+checkedTrajectories);
             DataPage.counter = 0;
             bw.newLine();
         }

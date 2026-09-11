@@ -106,7 +106,7 @@ public class KnnQueries {
             }
         }
 
-        String fullPathExportedFile = metricsPath+ File.separator+"knn-"+k+"-queries-"+Paths.get(parquetPath).getFileName().toString()+"-"+ Paths.get(queriesFilePath).getFileName().toString().replaceFirst("\\.[^.]+$", "")+".txt";
+        String fullPathExportedFile = metricsPath+ File.separator+"knn-"+k+"-"+Paths.get(parquetPath).getFileName().toString()+"-"+ Paths.get(queriesFilePath).getFileName().toString().replaceFirst("\\.[^.]+$", "")+".txt";
         BufferedWriter bw = new BufferedWriter(new FileWriter(fullPathExportedFile));
         BufferedReader br = new BufferedReader(new FileReader(queriesFilePath));
         bw.write("Time Exec\tQuery Points\tNum of Trajectories\tk-th Distance\tNum of Points\tData Pages\tParse\tMetadata Rounds\tTrajectory Query Rounds\n");
@@ -281,14 +281,6 @@ public class KnnQueries {
                                 continue;
                             }
                         }
-
-//                        if(group.get(0).getObjectId().equals("197387") && (group.size()==2)){
-//                            System.out.println(group.size());
-//                            System.out.println(group.size() >= segNum);
-//                            System.out.println(isFull);
-//                            group.forEach(s-> System.out.println(s));
-//                            System.exit(12);
-//                        }
 
                         if (/*group.size() >= segNum || */isFull) {
                             ParquetInputFormat.setFilterPredicate(jobSegmentPoints.getConfiguration(), eq(binaryColumn("objectId"), Binary.fromString(oid)));

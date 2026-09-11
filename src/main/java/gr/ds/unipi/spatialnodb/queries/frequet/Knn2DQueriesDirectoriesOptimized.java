@@ -106,7 +106,7 @@ public class Knn2DQueriesDirectoriesOptimized {
         int issuedQueriesTracklets = 0;
         int issuedQueriesFrechetComputation = 0;
 
-        String fullPathExportedFile = metricsPath+ File.separator+"knn-queries-"+Paths.get(parquetPath).getFileName().toString()+"-"+ Paths.get(queriesFilePath).getFileName().toString().replaceFirst("\\.[^.]+$", "")+".txt";
+        String fullPathExportedFile = metricsPath+ File.separator+"knn-"+k+"-"+Paths.get(parquetPath).getFileName().toString()+"-"+ Paths.get(queriesFilePath).getFileName().toString().replaceFirst("\\.[^.]+$", "")+".txt";
 
         BufferedWriter bw = new BufferedWriter(new FileWriter(fullPathExportedFile));
         BufferedReader br = new BufferedReader(new FileReader(queriesFilePath));
