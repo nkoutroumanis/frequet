@@ -344,8 +344,11 @@ public class KnnQueries {
                             .findFirst()
                             .orElseThrow(() -> new IllegalStateException(
                                     "No event log file found for application " + applicationId));
+            System.out.println(
+                    "Event log size = " + eventLogFile.length()
+            );
 
-            List<Long>[] lists = SparkLogParser.getMetricsPerNJobs(eventLogFile.getAbsolutePath(), queryEndJobs);
+            List<Long>[] lists = SparkLogParser.getMetricsPerNJobsLz4(eventLogFile.getAbsolutePath(), queryEndJobs, sparkConf);
             try {
                 SparkLogParser.enrichQueryAdHocFileWithMetrics(fullPathExportedFile, lists);
             }catch (Exception e) {

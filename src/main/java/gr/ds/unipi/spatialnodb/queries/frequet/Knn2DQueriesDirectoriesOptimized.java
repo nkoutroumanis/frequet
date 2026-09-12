@@ -499,7 +499,7 @@ public class Knn2DQueriesDirectoriesOptimized {
                             .orElseThrow(() -> new IllegalStateException(
                                     "No event log file found for application " + applicationId));
 
-            List<Long>[] lists = SparkLogParser.getMetricsPerNJobs(eventLogFile.getAbsolutePath(), queryEndJobs);
+            List<Long>[] lists = SparkLogParser.getMetricsPerNJobsLz4(eventLogFile.getAbsolutePath(), queryEndJobs, sparkConf);
             try {
                 SparkLogParser.enrichQueryAdHocFileWithMetrics(fullPathExportedFile, lists);
             }catch (Exception e) {

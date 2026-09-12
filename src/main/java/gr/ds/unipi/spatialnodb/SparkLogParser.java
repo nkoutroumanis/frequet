@@ -1,6 +1,11 @@
 package gr.ds.unipi.spatialnodb;
 
+import net.jpountz.lz4.LZ4FrameInputStream;
+import org.apache.spark.SparkConf;
+import org.apache.spark.io.CompressionCodec;
+
 import java.io.*;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
@@ -285,6 +290,70 @@ public class SparkLogParser {
             List<Long> bytesReadList = new ArrayList<>();
 
             BufferedReader br = new BufferedReader(new FileReader(filePath));
+            String line;
+            long shuffledBytes = 0;
+            long localBytesRead = 0;
+            long bytesRead = 0;
+
+            while((line = br.readLine())!=null){
+                if(line.contains("\"SparkListenerJobEnd\"")){
+                    counter++;
+                    if(counter==querySparkListenerJobEnd.get(queryIndex)){
+                        shuffled.add(shuffledBytes);
+                        localBytesReadList.add(localBytesRead);
+                        bytesReadList.add(bytesRead);
+
+                        shuffledBytes = 0;
+                        localBytesRead = 0;
+                        bytesRead = 0;
+
+                        queryIndex++;
+                        counter=0;
+                    }
+                }
+
+                if(line.contains("\"Remote Bytes Read\"")){
+                    int index = line.indexOf("\"Remote Bytes Read\"");
+                    String subline = line.substring(index);
+                    shuffledBytes = shuffledBytes + Long.parseLong(subline.substring(0,subline.indexOf(",")).substring(subline.indexOf(":")+1));
+                }
+
+                if(line.contains("\"Local Bytes Read\"")){
+                    int index = line.indexOf("\"Local Bytes Read\"");
+                    String subline = line.substring(index);
+                    localBytesRead = localBytesRead + Long.parseLong(subline.substring(0,subline.indexOf(",")).substring(subline.indexOf(":")+1));
+                }
+
+                if(line.contains("\"Bytes Read\"")){
+                    int index = line.indexOf("\"Bytes Read\"");
+                    String subline = line.substring(index);
+                    bytesRead = bytesRead + Long.parseLong(subline.substring(0,subline.indexOf(",")).substring(subline.indexOf(":")+1));
+                }
+
+            }
+            return new List[]{shuffled, localBytesReadList, bytesReadList};
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static List<Long>[] getMetricsPerNJobsLz4(String filePath, List<Integer> querySparkListenerJobEnd, SparkConf sparkConf){
+        try {
+            int queryIndex = 0;
+            int counter = 0;
+            List<Long> shuffled = new ArrayList<>();
+            List<Long> localBytesReadList = new ArrayList<>();
+            List<Long> bytesReadList = new ArrayList<>();
+
+            CompressionCodec codec = CompressionCodec.createCodec(sparkConf);
+            InputStream fileStream = new FileInputStream(filePath);
+            InputStream decompressedStream =
+                    codec.compressedInputStream(fileStream);
+            BufferedReader br = new BufferedReader(
+                    new InputStreamReader(
+                            decompressedStream,
+                            StandardCharsets.UTF_8));
+
             String line;
             long shuffledBytes = 0;
             long localBytesRead = 0;

@@ -368,6 +368,17 @@ public class KnnQueries {
 
         sparkSession.close();
 
+//        InputStream inputStream = new FileInputStream(eventLogFile);
+//
+//        if (eventLogFile.getName().endsWith(".lz4")) {
+//            inputStream = new LZ4FrameInputStream(inputStream);
+//        }
+//
+//        BufferedReader reader = new BufferedReader(
+//                new InputStreamReader(inputStream, StandardCharsets.UTF_8)
+//        );
+
+
         br = new BufferedReader(new FileReader(fullPathExportedFile));
         List<Integer> queryEndJobs = new ArrayList<>();
         br.readLine();
@@ -391,7 +402,7 @@ public class KnnQueries {
                             .orElseThrow(() -> new IllegalStateException(
                                     "No event log file found for application " + applicationId));
 
-            List<Long>[] lists = SparkLogParser.getMetricsPerNJobs(eventLogFile.getAbsolutePath(), queryEndJobs);
+            List<Long>[] lists = SparkLogParser.getMetricsPerNJobsLz4(eventLogFile.getAbsolutePath(), queryEndJobs, sparkConf);
             try {
                 SparkLogParser.enrichQueryAdHocFileWithMetrics(fullPathExportedFile, lists);
             }catch (Exception e) {
