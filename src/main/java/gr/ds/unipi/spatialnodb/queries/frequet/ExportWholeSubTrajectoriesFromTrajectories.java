@@ -15,12 +15,14 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Random;
+import java.util.concurrent.ThreadLocalRandom;
 
 import static gr.ds.unipi.spatialnodb.AppConfig.loadConfig;
 
-public class ExportWholeTrajectories {
+public class ExportWholeSubTrajectoriesFromTrajectories {
     public static void main(String[] args) {
-        Config config = loadConfig("export-trajectories-ddtg.conf");
+        Config config = loadConfig("export-trajectories-worldtrace.conf");
 
         Config dataLoading = config.getConfig("export-trajectories");
         final String rawDataPath = dataLoading.getString("rawDataPath");
@@ -33,7 +35,7 @@ public class ExportWholeTrajectories {
         final String delimiter = dataLoading.getString("delimiter");
         final int n = dataLoading.getInt("numberOfTrajectories");
 
-
+        int numberOfPointsPerTrajectory = 30;
         SimpleDateFormat sdf =  new SimpleDateFormat(dateFormat);
         SparkConf sparkConf = new SparkConf()/*.setMaster("local[*]").set("spark.executor.memory","1g")*/.registerKryoClasses(new Class[]{SmallHilbertCurve.class, HilbertUtil.class});
         sparkConf.setAppName("Export whole Trajectories from raw files");
@@ -82,21 +84,21 @@ public class ExportWholeTrajectories {
             tuple.sort(comp);
 
             return tuple;
-        }).filter(f-> f.size() != 1)/*.collect();//.filter(f-> f.size() != 1)*/.filter(f->f.size()<=200).takeSample(false, n);
-//               .map(f->{
-//                   StringBuilder sb = new StringBuilder();
-//                   for (Tuple3<Double, Double, Long> doubleDoubleLongTuple3 : f) {
-//                       sb.append(doubleDoubleLongTuple3._1()).append(",").append(doubleDoubleLongTuple3._2()).append(",").append(doubleDoubleLongTuple3._3()).append(";");
-//                   }
-//                   return sb.toString();
-//               })
-//               .coalesce(1).saveAsTextFile("/Users/nicholaskoutroumanis/Documents/Implementations/InteliJ IDEA Projects/Frequet/data/ddth/");
+        }).filter(f-> f.size() >=numberOfPointsPerTrajectory).takeSample(false, n);
 
         try (BufferedWriter writer = new BufferedWriter(new FileWriter(writePath))) {
             for (List<Tuple3<Double, Double, Long>> trajectory : trajectories) {
-                for (Tuple3<Double, Double, Long> doubleDoubleLongTuple3 : trajectory) {
-                    writer.write(doubleDoubleLongTuple3._1()+","+doubleDoubleLongTuple3._2()+","+doubleDoubleLongTuple3._3()+";");
+
+                int points = trajectory.size();
+                int start = ThreadLocalRandom.current().nextInt(points-numberOfPointsPerTrajectory+1);
+
+                for (int i = start; i < start+numberOfPointsPerTrajectory; i++) {
+                    writer.write(trajectory.get(i)._1()+","+trajectory.get(i)._2()+","+trajectory.get(i)._3()+";");
                 }
+
+//                for (Tuple3<Double, Double, Long> doubleDoubleLongTuple3 : trajectory) {
+//                    writer.write(doubleDoubleLongTuple3._1()+","+doubleDoubleLongTuple3._2()+","+doubleDoubleLongTuple3._3()+";");
+//                }
                 writer.newLine();
             }
         } catch (IOException e) {

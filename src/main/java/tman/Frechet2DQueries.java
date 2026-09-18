@@ -176,8 +176,8 @@ public class Frechet2DQueries {
             FilterPredicate fp = null;
             if(!ranges.isEmpty()){
                 fp = and(gtEq(longColumn("key"), ranges.get(0).lo), lt(longColumn("key"), ranges.get(0).hi));
+                w = w + (ranges.get(0).hi-ranges.get(0).lo);
             }
-            w = w + (ranges.get(0).hi-ranges.get(0).lo);
 
             for (int i = 1; i < ranges.size(); i++) {
                 if(ranges.get(i).hi-ranges.get(i).lo==1){

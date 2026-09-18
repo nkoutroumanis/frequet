@@ -103,7 +103,7 @@ public class Frechet2DQueriesDirectoriesIntervalsMBRVar2 {
             }
         }
 
-        String fullPathExportedFile = metricsPath+ File.separator+"prunings-frechet-"+epsilon+"-"+"-mbr-var2-"+Paths.get(parquetPath).getFileName().toString()+"-"+ Paths.get(queriesFilePath).getFileName().toString().replaceFirst("\\.[^.]+$", "")+".txt";
+        String fullPathExportedFile = metricsPath+ File.separator+"prunings-frechet-"+epsilon+"-"+"mbr-var2-"+Paths.get(parquetPath).getFileName().toString()+"-"+ Paths.get(queriesFilePath).getFileName().toString().replaceFirst("\\.[^.]+$", "")+".txt";
         BufferedWriter bw = new BufferedWriter(new FileWriter(fullPathExportedFile));
         BufferedReader br = new BufferedReader(new FileReader(queriesFilePath));
         bw.write("Query Points\tIntersected Cubes\tAll Prunings Pruned\ttrajectoriesInCells\tpreLoadTrajectories\tpreLoadTrajectories Pruned\tendPointsTrajectories\tendPointsTrajectories Pruned\tlocalPruningTrajectories\tlocalPruningTrajectories Pruned\tgapPruningTrajectories\tgapPruningTrajectories Pruned\tfrechetTrajectories\tfrechetTrajectories Pruned\n");

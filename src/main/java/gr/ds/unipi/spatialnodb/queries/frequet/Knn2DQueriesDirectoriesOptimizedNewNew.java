@@ -22,6 +22,7 @@ import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.sql.SparkSession;
 import org.davidmoten.hilbert.HilbertCurve;
 import org.davidmoten.hilbert.SmallHilbertCurve;
+import scala.Tuple2;
 
 import java.io.*;
 import java.nio.file.Paths;
@@ -31,7 +32,7 @@ import static gr.ds.unipi.spatialnodb.AppConfig.loadConfig;
 import static org.apache.parquet.filter2.predicate.FilterApi.binaryColumn;
 import static org.apache.parquet.filter2.predicate.FilterApi.in;
 
-public class Knn2DQueriesDirectoriesOptimizedNew {
+public class Knn2DQueriesDirectoriesOptimizedNewNew {
     public static void main(String args[]) throws IOException {
 
         Config config = loadConfig("queries.conf");
@@ -198,12 +199,13 @@ public class Knn2DQueriesDirectoriesOptimizedNew {
                             return t;
                         } else {
                             v.add(seg._2);
-                            v.sort(Comparator.comparingLong(a -> Math.abs(a.getInterval()[0])));
+//                            v.sort(Comparator.comparingLong(a -> Math.abs(a.getInterval()[0])));
                             return v;
                         }
                     });
                 });
-                flush(identifiedTrajSegments, flushedTrajectories);
+                flushLowerBoundK(identifiedTrajSegments, flushedTrajectories, trajectoryQuery, (int)Math.ceil(k));
+//                flushLowerBoundK(pairRDD, identifiedTrajSegments, flushedTrajectories, trajectoryQuery, k);
                 issuedQueriesTracklets++;
             }
 
@@ -236,11 +238,35 @@ public class Knn2DQueriesDirectoriesOptimizedNew {
                 queriedTrajectoriesCounter += flushedTrajectories.size();
                 flushedTrajectories.clear();
                 issuedQueriesFrechetComputation++;
+
+                identifiedTrajSegments.forEach((a,b)->{
+                    if(isFull(b)) {
+                        if (!canBePruned(b, trajectoryQuery, trajectoryQueue.getMaxScore())) {
+                            flushedTrajectories.add(Binary.fromString(a));
+                        }
+                    }
+                });
+
+                flushedTrajectories.forEach(identifiedTrajSegments::remove);
+
+                if(!flushedTrajectories.isEmpty()){
+                    ParquetInputFormat.setFilterPredicate(jobWholeTrajectory.getConfiguration(), in(binaryColumn("objectId"), flushedTrajectories) /*filterPredicate*/);
+                    JavaPairRDD<Void, TrajectorySegment> pairRDD1 = (JavaPairRDD<Void, TrajectorySegment>) jsc.newAPIHadoopFile(parquetPath + File.separator + "idIndex", ParquetInputFormat.class, Void.class, TrajectorySegment.class, jobWholeTrajectory.getConfiguration());
+                    List<TrajectoryScore> ts1 = pairRDD1.map(t -> TrajectoryScore.newTrajectoryScore(t._2, HilbertUtil.frechetDistance(trajectoryQuery, t._2.getSpatialPoints()))).collect();
+                    ts1.forEach(trajectoryQueue::add);
+                    checked.add(flushedTrajectories.size());
+                    queriedTrajectoriesCounter += flushedTrajectories.size();
+                    flushedTrajectories.clear();
+                    issuedQueriesFrechetComputation++;
+                }
+
             }
+
+
 
             while((trajectoryQueue.getSize() < k || queueCells.peek().getScore() < trajectoryQueue.getMaxScore()) && !queueCells.isEmpty()) {
                 sb.setLength(0);
-                int z = initialCubes.size();//visitedCubes.size();
+                int z = visitedCubes.size();//initialCubes.size();
                 while(z>0) {
                     CellScore cellScore = queueCells.poll();
                     if(cellScore!=null) {
@@ -397,6 +423,107 @@ public class Knn2DQueriesDirectoriesOptimizedNew {
         });
     }
 
+    private static void flushLowerBoundK(HashMap<String, List<TrajectorySegmentWithMetadata>> identifiedTrajectories, HashSet<Binary> flushedtrajectories, SpatialPoint[] query, int k){
+
+        List<Tuple2<String, Double>>  firstTrajectories  = new ArrayList<>();
+
+        identifiedTrajectories.forEach((key, e)->{
+            e.sort(Comparator.comparingLong(a -> Math.abs(a.getInterval()[0])));
+
+            if(e.size()==1 && e.get(0).getInterval()[0]==1 && e.get(0).getInterval()[1]<0){
+                firstTrajectories.add(Tuple2.apply(e.get(0).getTrajectorySegment().getObjectId(), getLBDistance(e,query)));
+            }else if(e.get(0).getInterval()[0]==1 && e.get(e.size()-1).getInterval()[1]<1){
+                long y = e.get(0).getInterval()[1];
+                for (int i = 1; i < e.size()-1; i++) {
+                    if(y+1 != e.get(i).getInterval()[0]) {return;}
+                    y = e.get(i).getInterval()[1];
+                }
+                if(y+1!=e.get(e.size()-1).getInterval()[0]){return;}
+                firstTrajectories.add(Tuple2.apply(e.get(0).getTrajectorySegment().getObjectId(), getLBDistance(e,query)));
+            }
+        });
+
+        firstTrajectories.sort((a, b) -> Double.compare(a._2(), b._2()));
+
+        for (int i = 0; i < Math.min(k,firstTrajectories.size()); i++) {
+            flushedtrajectories.add(Binary.fromString(firstTrajectories.get(i)._1()));
+            identifiedTrajectories.remove(firstTrajectories.get(i)._1());
+        }
+
+
+//        if(firstTrajectories.size()>k){
+//            double distance = 0;
+//            for (int i = 1; i < k; i++) {
+//                distance = Math.min(distance,firstTrajectories.get(i)._2 - firstTrajectories.get(i-1)._2);
+//            }
+//
+//            int additionalPos = 0;
+//            for(int i = k; i<firstTrajectories.size(); i++) {
+//                if(firstTrajectories.get(i)._2-firstTrajectories.get(i-1)._2 >distance ){
+//                    break;
+//                }
+//                additionalPos++;
+//            }
+//
+//            for (int i = 0; i <k+additionalPos; i++) {
+//                flushedtrajectories.add(Binary.fromString(firstTrajectories.get(i)._1()));
+//                identifiedTrajectories.remove(firstTrajectories.get(i)._1());
+//            }
+//
+//        }else{
+//            for (int i = 0; i < Math.min(k,firstTrajectories.size()); i++) {
+//                flushedtrajectories.add(Binary.fromString(firstTrajectories.get(i)._1()));
+//                identifiedTrajectories.remove(firstTrajectories.get(i)._1());
+//            }
+//        }
+    }
+
+    private static void flushLowerBoundK(JavaPairRDD<Void, TrajectorySegmentWithMetadata> pairRDD, HashMap<String, List<TrajectorySegmentWithMetadata>> identifiedTrajectories, HashSet<Binary> flushedtrajectories,  SpatialPoint[] query, int k){
+
+        List<Tuple2<Double, List<TrajectorySegmentWithMetadata>>> fullTrajectories = new ArrayList<>();
+        List<Tuple2<Double,List<TrajectorySegmentWithMetadata>>> trjs = pairRDD.mapToPair(f-> Tuple2.apply(f._2.getTrajectorySegment().getObjectId(),f._2)).groupByKey().mapToPair(f->{
+            List<TrajectorySegmentWithMetadata> segments = new ArrayList<>((int)f._2.spliterator().getExactSizeIfKnown());
+            f._2.forEach(segments::add);
+            segments.sort(Comparator.comparingLong(a -> Math.abs(a.getInterval()[0])));
+
+            return Tuple2.apply(isFull(segments), segments);
+        }).mapToPair(f->{
+            if(f._1){
+                return Tuple2.apply(getLBDistance(f._2, query), f._2);
+            }
+                return Tuple2.apply(-1d, f._2);
+        }).collect();
+
+
+        trjs.forEach(i->{
+            if(i._1<0){
+                identifiedTrajectories.put(i._2.get(0).getTrajectorySegment().getObjectId(), i._2);
+            }else{
+                fullTrajectories.add(Tuple2.apply(i._1, i._2));
+            }
+        });
+
+        fullTrajectories.sort(Comparator.comparingDouble(a -> a._1));
+
+        for (int i = 0; i < Math.min(k, fullTrajectories.size()); i++) {
+            flushedtrajectories.add(Binary.fromString(fullTrajectories.get(i)._2.get(0).getTrajectorySegment().getObjectId()));
+        }
+
+        for (int i = k; i < fullTrajectories.size(); i++) {
+            identifiedTrajectories.put(fullTrajectories.get(i)._2.get(0).getTrajectorySegment().getObjectId(),fullTrajectories.get(i)._2);
+        }
+
+//        trjs.filter(f-> f._1).mapToPair(f-> Tuple2.apply(f._2.get(0).getTrajectorySegment().getObjectId(), getLBDistance(f._2, query))).takeOrdered(k, new Comparator<Tuple2<String, Double>>() {
+//            @Override
+//            public int compare(Tuple2<String, Double> o1, Tuple2<String, Double> o2) {
+//                return 0;
+//            }
+//        });
+//        trjs.filter(f-> !f._1).map(f-> f._2).collect();
+//
+//        trjs.unpersist();
+    }
+
     private static boolean isFull(List<TrajectorySegmentWithMetadata> trajectorySegments){
         if(trajectorySegments.size()==1 && trajectorySegments.get(0).getInterval()[0]==1 && trajectorySegments.get(0).getInterval()[1]<0){
             return true;
@@ -449,6 +576,35 @@ public class Knn2DQueriesDirectoriesOptimizedNew {
         return false;
     }
 
+    private static double getLBDistance(List<TrajectorySegmentWithMetadata> trajectorySegments, SpatialPoint[] trajectoryQuery){
+        TrajectorySegmentWithMetadata startSegment = trajectorySegments.get(0);
+        TrajectorySegmentWithMetadata endSegment = trajectorySegments.get(trajectorySegments.size()-1);
+
+        double lowerBound = -Double.MAX_VALUE;
+
+        //first point of the trajectory
+        if(startSegment.getPivots().length==1){
+            lowerBound = Math.max(lowerBound,HilbertUtil.euclideanDistance(startSegment.getPivots()[0].getLongitude(), startSegment.getPivots()[0].getLatitude(), trajectoryQuery[0].getLongitude(), trajectoryQuery[0].getLatitude()));
+        }else if(startSegment.getInterval()[1]<0){
+            lowerBound = Math.max(lowerBound,HilbertUtil.euclideanDistance(startSegment.getPivots()[startSegment.getPivots().length - 2].getLongitude(), startSegment.getPivots()[startSegment.getPivots().length - 2].getLatitude(), trajectoryQuery[0].getLongitude(), trajectoryQuery[0].getLatitude()));
+        }else{
+            lowerBound = Math.max(lowerBound,HilbertUtil.euclideanDistance(startSegment.getPivots()[startSegment.getPivots().length - 1].getLongitude(), startSegment.getPivots()[startSegment.getPivots().length - 1].getLatitude(), trajectoryQuery[0].getLongitude(), trajectoryQuery[0].getLatitude()));
+        }
+
+        //last point of the trajectory
+        lowerBound = Math.max(lowerBound,HilbertUtil.euclideanDistance(endSegment.getPivots()[endSegment.getPivots().length-1].getLongitude(),endSegment.getPivots()[endSegment.getPivots().length-1].getLatitude(),trajectoryQuery[trajectoryQuery.length-1].getLongitude(),trajectoryQuery[trajectoryQuery.length-1].getLatitude()));
+
+        for (TrajectorySegmentWithMetadata trajectorySegment : trajectorySegments) {
+            if(trajectorySegment.getInterval()[0]>1 && trajectorySegment.getInterval()[1]>1){
+                for (SpatialPoint pivot : trajectorySegment.getPivots()) {
+                    lowerBound = Math.max(lowerBound,HilbertUtil.pointMinDist(pivot.getLongitude(), pivot.getLatitude(), trajectoryQuery));
+                }
+            }
+        }
+
+        return lowerBound;
+    }
+
     private static int countPoints(String line) {
         int count = 0;
         for (int i = 0; i < line.length(); i++) {
@@ -475,5 +631,4 @@ public class Knn2DQueriesDirectoriesOptimizedNew {
 
         return neg ? -result : result;
     }
-
 }

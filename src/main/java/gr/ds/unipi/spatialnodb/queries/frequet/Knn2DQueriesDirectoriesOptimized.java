@@ -110,7 +110,7 @@ public class Knn2DQueriesDirectoriesOptimized {
 
         BufferedWriter bw = new BufferedWriter(new FileWriter(fullPathExportedFile));
         BufferedReader br = new BufferedReader(new FileReader(queriesFilePath));
-        bw.write("Time Exec\tQuery Points\tNum of Trajectories\tk-th Distance\tNum of Points\tData Pages\tParse\tMetadata Rounds\tTrajectory Query Rounds\tChecked Trajectories\n");
+        bw.write("Time Exec\tQuery Points\tNum of Trajectories\tk-th Distance\tNum of Points\tData Pages\tIntersected Cubes\tParse\tMetadata Rounds\tTrajectory Query Rounds\tChecked Trajectories\n");
 
         String query;
         while ((query = br.readLine()) != null) {
@@ -461,7 +461,7 @@ public class Knn2DQueriesDirectoriesOptimized {
                 numOfPoints = numOfPoints + trajectoryScore.getTrajectorySegment().getSpatialPoints().length;
             }
 
-            bw.write((endTime - startTime)+"\t"+trajectoryQuery.length+"\t"+trajectoryQueue.getSize()+"\t"+trajectoryQueue.getMaxScore()+"\t"+numOfPoints+"\t"+ DataPage.counter+"\t"+parseAndCubeIndex+"\t"+issuedQueriesTracklets+"\t"+issuedQueriesFrechetComputation+"\t"+queriedTrajectoriesCounter);
+            bw.write((endTime - startTime)+"\t"+trajectoryQuery.length+"\t"+trajectoryQueue.getSize()+"\t"+trajectoryQueue.getMaxScore()+"\t"+numOfPoints+"\t"+ DataPage.counter+"\t"+initialCubes.size()+"\t"+parseAndCubeIndex+"\t"+issuedQueriesTracklets+"\t"+issuedQueriesFrechetComputation+"\t"+queriedTrajectoriesCounter);
             DataPage.counter = 0;
             queriedTrajectoriesCounter = 0;
             issuedQueriesTracklets = 0;

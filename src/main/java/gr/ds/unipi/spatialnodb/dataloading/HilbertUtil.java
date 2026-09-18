@@ -487,6 +487,14 @@ public class HilbertUtil {
         return true;
     }
 
+    public static double pointMinDist(double x, double y, SpatialPoint[] spatialPoints) {
+        double minDist = Double.MAX_VALUE;
+        for (SpatialPoint sp : spatialPoints) {
+            minDist = Double.min(minDist, HilbertUtil.euclideanDistance(x, y,sp.getLongitude(), sp.getLatitude()));
+        }
+        return minDist;
+    }
+
     public static double trajectoryMinDist(double xMin, double yMin, double xMax, double yMax, SpatialPoint[] spatialPoints) {
         double minDist = Double.MAX_VALUE;
         for (SpatialPoint sp : spatialPoints) {
