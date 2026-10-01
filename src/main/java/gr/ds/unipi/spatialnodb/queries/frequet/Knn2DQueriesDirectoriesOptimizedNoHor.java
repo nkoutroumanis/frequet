@@ -8,6 +8,7 @@ import gr.ds.unipi.spatialnodb.messages.common.IndexUtils;
 import gr.ds.unipi.spatialnodb.messages.common.SpatialPoint;
 import gr.ds.unipi.spatialnodb.messages.common.SpatioTemporalPoint;
 import gr.ds.unipi.spatialnodb.messages.common.trajparquet.*;
+import gr.ds.unipi.spatialnodb.messages.common.trajparquet.pathReadParquet.ParquetInputFormatWithKey;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -19,10 +20,15 @@ import org.apache.parquet.io.api.Binary;
 import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaSparkContext;
+import org.apache.spark.api.java.function.FlatMapFunction;
+import org.apache.spark.api.java.function.Function;
+import org.apache.spark.api.java.function.MapFunction;
+import org.apache.spark.api.java.function.PairFlatMapFunction;
 import org.apache.spark.sql.SparkSession;
 import org.davidmoten.hilbert.HilbertCurve;
 import org.davidmoten.hilbert.SmallHilbertCurve;
 import scala.Tuple2;
+import scala.Tuple3;
 
 import java.io.*;
 import java.nio.file.Paths;
@@ -32,7 +38,7 @@ import static gr.ds.unipi.spatialnodb.AppConfig.loadConfig;
 import static org.apache.parquet.filter2.predicate.FilterApi.binaryColumn;
 import static org.apache.parquet.filter2.predicate.FilterApi.in;
 
-public class Knn2DQueriesDirectoriesOptimizedNewNew {
+public class Knn2DQueriesDirectoriesOptimizedNoHor {
     public static void main(String args[]) throws IOException {
 
         Config config = loadConfig("queries.conf");
@@ -73,7 +79,8 @@ public class Knn2DQueriesDirectoriesOptimizedNewNew {
         Job jobTrajectorySegments = Job.getInstance();
         int queriedTrajectoriesCounter = 0;
 
-        ParquetInputFormat.setReadSupportClass(jobWholeTrajectory, TrajectorySegmentReadSupport.class);
+//        ParquetInputFormat.setReadSupportClass(jobWholeTrajectory, TrajectorySegmentReadSupport.class);
+        ParquetInputFormat.setReadSupportClass(jobWholeTrajectory, TrajectorySegmentWithIntervalMetadataReadSupport.class);
         ParquetInputFormat.setReadSupportClass(jobTrajectorySegments, TrajectorySegmentPartialWithMetadataReadSupport.class);
 //        ParquetInputFormat.setFilterPredicate(jobTrajectorySegments.getConfiguration(), notEq(longColumn("intervalStart"), null));
 
@@ -185,26 +192,28 @@ public class Knn2DQueriesDirectoriesOptimizedNewNew {
                 }
             long parseAndCubeIndex = System.currentTimeMillis() - startTime;
 
-            HashMap<String, List<TrajectorySegmentWithMetadata>> identifiedTrajSegments = new HashMap<>();
+            HashMap<String, List<Tuple2<Long, TrajectorySegmentWithMetadata>>> identifiedTrajSegments = new HashMap<>();
             HashSet<Binary> flushedTrajectories = new HashSet<>();
+            HashSet<Long> flushedCellIds = new HashSet<>();
+            StringBuilder flushedCellIdsSb = new StringBuilder();
 
             if(sb.length()!=0){
                 sb.deleteCharAt(sb.length()-1);
-                JavaPairRDD<Void, TrajectorySegmentWithMetadata> pairRDD = (JavaPairRDD<Void, TrajectorySegmentWithMetadata>) jsc.newAPIHadoopFile(sb.toString(), ParquetInputFormat.class, Void.class, TrajectorySegmentWithMetadata.class, jobTrajectorySegments.getConfiguration());
+                JavaPairRDD<Long, TrajectorySegmentWithMetadata> pairRDD = (JavaPairRDD<Long, TrajectorySegmentWithMetadata>) jsc.newAPIHadoopFile(sb.toString(), ParquetInputFormatWithKey.class, Long.class, TrajectorySegmentWithMetadata.class, jobTrajectorySegments.getConfiguration());
                 pairRDD.collect().forEach(seg->{
                     identifiedTrajSegments.compute(seg._2.getTrajectorySegment().getObjectId(), (i, v) -> {
                         if (v == null) {
-                            List<TrajectorySegmentWithMetadata> t = new ArrayList<>();
-                            t.add(seg._2);
+                            List<Tuple2<Long, TrajectorySegmentWithMetadata>> t = new ArrayList<>();
+                            t.add(seg);
                             return t;
                         } else {
-                            v.add(seg._2);
+                            v.add(seg);
 //                            v.sort(Comparator.comparingLong(a -> Math.abs(a.getInterval()[0])));
                             return v;
                         }
                     });
                 });
-                flushLowerBoundK(identifiedTrajSegments, flushedTrajectories, trajectoryQuery, (int)Math.ceil(k));
+                flushLowerBoundK(identifiedTrajSegments, flushedTrajectories, flushedCellIds, trajectoryQuery, (int)Math.ceil(k));
 //                flushLowerBoundK(pairRDD, identifiedTrajSegments, flushedTrajectories, trajectoryQuery, k);
                 issuedQueriesTracklets++;
             }
@@ -230,12 +239,19 @@ public class Knn2DQueriesDirectoriesOptimizedNewNew {
                 });
 
             if(flushedTrajectories.size()>=k || queueCells.isEmpty()) {
-                ParquetInputFormat.setFilterPredicate(jobWholeTrajectory.getConfiguration(), in(binaryColumn("objectId"), flushedTrajectories) /*filterPredicate*/);
-                JavaPairRDD<Void, TrajectorySegment> pairRDD = (JavaPairRDD<Void, TrajectorySegment>) jsc.newAPIHadoopFile(parquetPath + File.separator + "idIndex", ParquetInputFormat.class, Void.class, TrajectorySegment.class, jobWholeTrajectory.getConfiguration());
-                List<TrajectoryScore> ts = pairRDD.map(t -> TrajectoryScore.newTrajectoryScore(t._2, HilbertUtil.frechetDistance(trajectoryQuery, t._2.getSpatialPoints()))).collect();
+                ParquetInputFormat.setFilterPredicate(jobWholeTrajectory.getConfiguration(), in(binaryColumn("objectId"), flushedTrajectories));
+                for (Long flushedCellId : flushedCellIds) {
+                    flushedCellIdsSb.append(parquetPath).append(File.separator).append("stIndex").append(File.separator).append(flushedCellId).append(",");
+                }
+                flushedCellIdsSb.deleteCharAt(flushedCellIdsSb.length()-1);
+                JavaPairRDD<Void, TrajectorySegmentWithIntervalMetadata> pairRDD = (JavaPairRDD<Void, TrajectorySegmentWithIntervalMetadata>) jsc.newAPIHadoopFile(flushedCellIdsSb.toString(), ParquetInputFormat.class, Void.class, TrajectorySegmentWithIntervalMetadata.class, jobWholeTrajectory.getConfiguration());
+                List<TrajectoryScore> ts = pairRDD.groupBy(f->f._2().getTrajectorySegment().getObjectId(), Integer.parseInt(args[0])).map(formTrajectoriesFunction).map(t -> TrajectoryScore.newTrajectoryScore(t, HilbertUtil.frechetDistance(trajectoryQuery, t.getSpatialPoints()))).collect();
+
                 ts.forEach(trajectoryQueue::add);
                 checked.add(flushedTrajectories.size());
                 queriedTrajectoriesCounter += flushedTrajectories.size();
+                flushedCellIdsSb.setLength(0);
+                flushedCellIds.clear();
                 flushedTrajectories.clear();
                 issuedQueriesFrechetComputation++;
 
@@ -243,6 +259,11 @@ public class Knn2DQueriesDirectoriesOptimizedNewNew {
                     if(isFull(b)) {
                         if (!canBePruned(b, trajectoryQuery, trajectoryQueue.getMaxScore())) {
                             flushedTrajectories.add(Binary.fromString(a));
+
+                            for (Tuple2<Long, TrajectorySegmentWithMetadata> longTrajectorySegmentWithMetadataTuple2 : b) {
+                                flushedCellIds.add(longTrajectorySegmentWithMetadataTuple2._1);
+                            }
+
                         }
                     }
                 });
@@ -252,15 +273,21 @@ public class Knn2DQueriesDirectoriesOptimizedNewNew {
                 if(!flushedTrajectories.isEmpty()){
                     double d = trajectoryQueue.getMaxScore();
                     ParquetInputFormat.setFilterPredicate(jobWholeTrajectory.getConfiguration(), in(binaryColumn("objectId"), flushedTrajectories) /*filterPredicate*/);
-                    JavaPairRDD<Void, TrajectorySegment> pairRDD1 = (JavaPairRDD<Void, TrajectorySegment>) jsc.newAPIHadoopFile(parquetPath + File.separator + "idIndex", ParquetInputFormat.class, Void.class, TrajectorySegment.class, jobWholeTrajectory.getConfiguration());
-                    List<TrajectoryScore> ts1 = pairRDD1.map(t -> TrajectoryScore.newTrajectoryScore(t._2, HilbertUtil.frechetDistance(trajectoryQuery, t._2.getSpatialPoints()))).filter(f->f.getScore()<=d).collect();
+                    for (Long flushedCellId : flushedCellIds) {
+                        flushedCellIdsSb.append(parquetPath).append(File.separator).append("stIndex").append(File.separator).append(flushedCellId).append(",");
+                    }
+                    flushedCellIdsSb.deleteCharAt(flushedCellIdsSb.length()-1);
+                    JavaPairRDD<Void, TrajectorySegmentWithIntervalMetadata> pairRDD1 = (JavaPairRDD<Void, TrajectorySegmentWithIntervalMetadata>) jsc.newAPIHadoopFile(flushedCellIdsSb.toString(), ParquetInputFormat.class, Void.class, TrajectorySegmentWithIntervalMetadata.class, jobWholeTrajectory.getConfiguration());
+                    List<TrajectoryScore> ts1 = pairRDD1.groupBy(f->f._2().getTrajectorySegment().getObjectId(), Integer.parseInt(args[0])).map(formTrajectoriesFunction).map(t -> TrajectoryScore.newTrajectoryScore(t, HilbertUtil.frechetDistance(trajectoryQuery, t.getSpatialPoints()))).collect();
+
                     ts1.forEach(trajectoryQueue::add);
                     checked.add(flushedTrajectories.size());
                     queriedTrajectoriesCounter += flushedTrajectories.size();
+                    flushedCellIdsSb.setLength(0);
+                    flushedCellIds.clear();
                     flushedTrajectories.clear();
                     issuedQueriesFrechetComputation++;
                 }
-
             }
 
 
@@ -297,48 +324,58 @@ public class Knn2DQueriesDirectoriesOptimizedNewNew {
                 if(sb.length()!=0){
                     sb.deleteCharAt(sb.length()-1);
                     issuedQueriesTracklets++;
-                    JavaPairRDD<Void, TrajectorySegmentWithMetadata> pairRDD = (JavaPairRDD<Void, TrajectorySegmentWithMetadata>) jsc.newAPIHadoopFile(sb.toString(), ParquetInputFormat.class, Void.class, TrajectorySegmentWithMetadata.class, jobTrajectorySegments.getConfiguration());
+                    JavaPairRDD<Long, TrajectorySegmentWithMetadata> pairRDD = (JavaPairRDD<Long, TrajectorySegmentWithMetadata>) jsc.newAPIHadoopFile(sb.toString(), ParquetInputFormatWithKey.class, Long.class, TrajectorySegmentWithMetadata.class, jobTrajectorySegments.getConfiguration());
 
-                    List<TrajectorySegmentWithMetadata> segs = pairRDD.map(f->f._2).collect();
+                    List<Tuple2<Long, TrajectorySegmentWithMetadata>> segs = pairRDD.collect();
 
-                    for (TrajectorySegmentWithMetadata seg : segs) {
-                        identifiedTrajSegments.compute(seg.getTrajectorySegment().getObjectId(), (i, v) -> {
+                    for (Tuple2<Long, TrajectorySegmentWithMetadata> seg : segs) {
+                        identifiedTrajSegments.compute(seg._2.getTrajectorySegment().getObjectId(), (i, v) -> {
                             if (v == null) {
-                                List<TrajectorySegmentWithMetadata> t = new ArrayList<>();
+                                List<Tuple2<Long, TrajectorySegmentWithMetadata>> t = new ArrayList<>();
                                 t.add(seg);
                                 return t;
                             } else {
                                 v.add(seg);
-                                v.sort(Comparator.comparingLong(a -> Math.abs(a.getInterval()[0])));
+                                v.sort(Comparator.comparingLong(a -> Math.abs(a._2.getInterval()[0])));
                                 return v;
                             }
                         });
 
-                        List<TrajectorySegmentWithMetadata> segmentList = identifiedTrajSegments.get(seg.getTrajectorySegment().getObjectId());
+                        List<Tuple2<Long,TrajectorySegmentWithMetadata>> segmentList = identifiedTrajSegments.get(seg._2.getTrajectorySegment().getObjectId());
                         if(isFull(segmentList)) {
                             if (trajectoryQueue.getSize() < k || !canBePruned(segmentList, trajectoryQuery, trajectoryQueue.getMaxScore())) {
-                                flushedTrajectories.add(Binary.fromString(seg.getTrajectorySegment().getObjectId()));
+                                flushedTrajectories.add(Binary.fromString(seg._2.getTrajectorySegment().getObjectId()));
+
+                                for (Tuple2<Long, TrajectorySegmentWithMetadata> longTrajectorySegmentWithMetadataTuple2 : segmentList) {
+                                    flushedCellIds.add(longTrajectorySegmentWithMetadataTuple2._1);
+                                }
                             }
-                            identifiedTrajSegments.remove(seg.getTrajectorySegment().getObjectId());
+                            identifiedTrajSegments.remove(seg._2.getTrajectorySegment().getObjectId());
                         }
                     }
                 }
 
                 if(!flushedTrajectories.isEmpty() && ( flushedTrajectories.size()>= (k-trajectoryQueue.getSize()) || queueCells.isEmpty())){
                     issuedQueriesFrechetComputation++;
-                    ParquetInputFormat.setFilterPredicate(jobWholeTrajectory.getConfiguration(), in(binaryColumn("objectId"), flushedTrajectories)/*filterPredicate*/);
-                    JavaPairRDD<Void, TrajectorySegment> pairRDD = (JavaPairRDD<Void, TrajectorySegment>) jsc.newAPIHadoopFile(parquetPath + "/" + "idIndex", ParquetInputFormat.class, Void.class, TrajectorySegment.class, jobWholeTrajectory.getConfiguration());
+                    ParquetInputFormat.setFilterPredicate(jobWholeTrajectory.getConfiguration(), in(binaryColumn("objectId"), flushedTrajectories) /*filterPredicate*/);
+                    for (Long flushedCellId : flushedCellIds) {
+                        flushedCellIdsSb.append(parquetPath).append(File.separator).append("stIndex").append(File.separator).append(flushedCellId).append(",");
+                    }
+                    flushedCellIdsSb.deleteCharAt(flushedCellIdsSb.length()-1);
+                    JavaPairRDD<Void, TrajectorySegmentWithIntervalMetadata> pairRDD = (JavaPairRDD<Void, TrajectorySegmentWithIntervalMetadata>) jsc.newAPIHadoopFile(flushedCellIdsSb.toString(), ParquetInputFormat.class, Void.class, TrajectorySegmentWithIntervalMetadata.class, jobWholeTrajectory.getConfiguration());
 
                     List<TrajectoryScore> ts;
                     if(trajectoryQueue.getSize()==k){
                         double d = trajectoryQueue.getMaxScore();
-                        ts = pairRDD.map(t -> TrajectoryScore.newTrajectoryScore(t._2, HilbertUtil.frechetDistance(trajectoryQuery, t._2.getSpatialPoints()))).filter(f->f.getScore()<=d).collect();
+                        ts =  pairRDD.groupBy(f->f._2().getTrajectorySegment().getObjectId(), Integer.parseInt(args[0])).map(formTrajectoriesFunction).map(t -> TrajectoryScore.newTrajectoryScore(t, HilbertUtil.frechetDistance(trajectoryQuery, t.getSpatialPoints()))).filter(f->f.getScore()<=d).collect();
                     }else{
-                        ts = pairRDD.map(t -> TrajectoryScore.newTrajectoryScore(t._2, HilbertUtil.frechetDistance(trajectoryQuery, t._2.getSpatialPoints()))).collect();
+                        ts =  pairRDD.groupBy(f->f._2().getTrajectorySegment().getObjectId(), Integer.parseInt(args[0])).map(formTrajectoriesFunction).map(t -> TrajectoryScore.newTrajectoryScore(t, HilbertUtil.frechetDistance(trajectoryQuery, t.getSpatialPoints()))).collect();
                     }
                     ts.forEach(trajectoryQueue::add);
                     queriedTrajectoriesCounter += flushedTrajectories.size();
                     checked.add(flushedTrajectories.size());
+                    flushedCellIdsSb.setLength(0);
+                    flushedCellIds.clear();
                     flushedTrajectories.clear();
                     if(queueCells.isEmpty()){
                         break;
@@ -410,145 +447,110 @@ public class Knn2DQueriesDirectoriesOptimizedNewNew {
         }
     }
 
-    private static void flush(HashMap<String, List<TrajectorySegmentWithMetadata>> identifiedTrajectories, HashSet<Binary> flushedtrajectories){
-        identifiedTrajectories.entrySet().removeIf(e->{
-            if(e.getValue().size()==1 && e.getValue().get(0).getInterval()[0]==1 && e.getValue().get(0).getInterval()[1]<0){
-                flushedtrajectories.add(Binary.fromString(e.getValue().get(0).getTrajectorySegment().getObjectId()));
-                return true;
-            }else if(e.getValue().get(0).getInterval()[0]==1 && e.getValue().get(e.getValue().size()-1).getInterval()[1]<1){
-                long y = e.getValue().get(0).getInterval()[1];
-                for (int i = 1; i < e.getValue().size()-1; i++) {
-                    if(y+1 != e.getValue().get(i).getInterval()[0]) {return false;}
-                    y = e.getValue().get(i).getInterval()[1];
-                }
-                if(y+1!=e.getValue().get(e.getValue().size()-1).getInterval()[0]){return false;}
+    static Function<Tuple2<String, Iterable<Tuple2<Void, TrajectorySegmentWithIntervalMetadata>>>, TrajectorySegment> formTrajectoriesFunction = new Function<Tuple2<String, Iterable<Tuple2<Void, TrajectorySegmentWithIntervalMetadata>>>, TrajectorySegment>() {
+        @Override
+        public TrajectorySegment call(Tuple2<String, Iterable<Tuple2<Void, TrajectorySegmentWithIntervalMetadata>>> f) throws Exception {
 
-                flushedtrajectories.add(Binary.fromString(e.getValue().get(0).getTrajectorySegment().getObjectId()));
-                return true;
+            List<TrajectorySegmentWithIntervalMetadata> trSegments = new ArrayList<>();
+            f._2.forEach(t->trSegments.add(t._2));
+
+            Comparator<TrajectorySegmentWithIntervalMetadata> comparator = Comparator.comparingLong(d-> d.getInterval()[0]);
+            trSegments.sort(comparator);
+
+            if(trSegments.size()==1 && trSegments.get(0).getInterval()[0]==1 && trSegments.get(0).getInterval()[1]<0){
+                return trSegments.get(0).getTrajectorySegment();
             }
-            return false;
-        });
-    }
 
-    private static void flushLowerBoundK(HashMap<String, List<TrajectorySegmentWithMetadata>> identifiedTrajectories, HashSet<Binary> flushedtrajectories, SpatialPoint[] query, int k){
+            long y;
+            if(trSegments.get(0).getInterval()[0]!=1 || trSegments.get(trSegments.size()-1).getInterval()[1]>0){
+                throw new Exception("Broken trajectory. All of its tracklets should have been retrieved.");
+            }else{
+                y = trSegments.get(0).getInterval()[1];
+            }
+            for (int i = 1; i < trSegments.size()-1; i++) {
+                if(y+1 != trSegments.get(i).getInterval()[0]) {throw new Exception("Broken trajectory. All of its tracklets should have been retrieved.");}
+                y = trSegments.get(i).getInterval()[1];
+            }
+            if(y+1!=trSegments.get(trSegments.size()-1).getInterval()[0]){throw new Exception("Broken trajectory. All of its tracklets should have been retrieved.");}
 
-        List<Tuple2<String, Double>>  firstTrajectories  = new ArrayList<>();
+            List<TrajectorySegment> ts = new ArrayList<>(trSegments.size());
+            trSegments.forEach(e->ts.add(e.getTrajectorySegment()));
+
+            return new TrajectorySegment(f._1, ts);
+        }
+    };
+
+//    private static void flush(HashMap<String, List<TrajectorySegmentWithMetadata>> identifiedTrajectories, HashSet<Binary> flushedtrajectories){
+//        identifiedTrajectories.entrySet().removeIf(e->{
+//            if(e.getValue().size()==1 && e.getValue().get(0).getInterval()[0]==1 && e.getValue().get(0).getInterval()[1]<0){
+//                flushedtrajectories.add(Binary.fromString(e.getValue().get(0).getTrajectorySegment().getObjectId()));
+//                return true;
+//            }else if(e.getValue().get(0).getInterval()[0]==1 && e.getValue().get(e.getValue().size()-1).getInterval()[1]<1){
+//                long y = e.getValue().get(0).getInterval()[1];
+//                for (int i = 1; i < e.getValue().size()-1; i++) {
+//                    if(y+1 != e.getValue().get(i).getInterval()[0]) {return false;}
+//                    y = e.getValue().get(i).getInterval()[1];
+//                }
+//                if(y+1!=e.getValue().get(e.getValue().size()-1).getInterval()[0]){return false;}
+//
+//                flushedtrajectories.add(Binary.fromString(e.getValue().get(0).getTrajectorySegment().getObjectId()));
+//                return true;
+//            }
+//            return false;
+//        });
+//    }
+
+    private static void flushLowerBoundK(HashMap<String, List<Tuple2<Long, TrajectorySegmentWithMetadata>>> identifiedTrajectories, HashSet<Binary> flushedtrajectories, HashSet<Long> flushedCellIds, SpatialPoint[] query, int k){
+
+        List<Tuple2<String, Double>>  firstTrajectories  = new ArrayList<>();//objectId, lbscore
 
         identifiedTrajectories.forEach((key, e)->{
-            e.sort(Comparator.comparingLong(a -> Math.abs(a.getInterval()[0])));
+            e.sort(Comparator.comparingLong(a -> Math.abs(a._2.getInterval()[0])));
 
-            if(e.size()==1 && e.get(0).getInterval()[0]==1 && e.get(0).getInterval()[1]<0){
-                firstTrajectories.add(Tuple2.apply(e.get(0).getTrajectorySegment().getObjectId(), getLBDistance(e,query)));
-            }else if(e.get(0).getInterval()[0]==1 && e.get(e.size()-1).getInterval()[1]<1){
-                long y = e.get(0).getInterval()[1];
+            if(e.size()==1 && e.get(0)._2.getInterval()[0]==1 && e.get(0)._2.getInterval()[1]<0){
+                firstTrajectories.add(Tuple2.apply(e.get(0)._2.getTrajectorySegment().getObjectId(), getLBDistance(e,query)));
+            }else if(e.get(0)._2.getInterval()[0]==1 && e.get(e.size()-1)._2.getInterval()[1]<1){
+                long y = e.get(0)._2.getInterval()[1];
                 for (int i = 1; i < e.size()-1; i++) {
-                    if(y+1 != e.get(i).getInterval()[0]) {return;}
-                    y = e.get(i).getInterval()[1];
+                    if(y+1 != e.get(i)._2.getInterval()[0]) {return;}
+                    y = e.get(i)._2.getInterval()[1];
                 }
-                if(y+1!=e.get(e.size()-1).getInterval()[0]){return;}
-                firstTrajectories.add(Tuple2.apply(e.get(0).getTrajectorySegment().getObjectId(), getLBDistance(e,query)));
+                if(y+1!=e.get(e.size()-1)._2.getInterval()[0]){return;}
+                firstTrajectories.add(Tuple2.apply(e.get(0)._2.getTrajectorySegment().getObjectId(), getLBDistance(e,query)));
             }
         });
 
         firstTrajectories.sort((a, b) -> Double.compare(a._2(), b._2()));
 
         for (int i = 0; i < Math.min(k,firstTrajectories.size()); i++) {
+            String objectId = firstTrajectories.get(i)._1();
+            identifiedTrajectories.get(objectId).forEach(o->flushedCellIds.add(o._1));
+        }
+
+        for (int i = 0; i < Math.min(k,firstTrajectories.size()); i++) {
             flushedtrajectories.add(Binary.fromString(firstTrajectories.get(i)._1()));
             identifiedTrajectories.remove(firstTrajectories.get(i)._1());
         }
-
-
-//        if(firstTrajectories.size()>k){
-//            double distance = 0;
-//            for (int i = 1; i < k; i++) {
-//                distance = Math.min(distance,firstTrajectories.get(i)._2 - firstTrajectories.get(i-1)._2);
-//            }
-//
-//            int additionalPos = 0;
-//            for(int i = k; i<firstTrajectories.size(); i++) {
-//                if(firstTrajectories.get(i)._2-firstTrajectories.get(i-1)._2 >distance ){
-//                    break;
-//                }
-//                additionalPos++;
-//            }
-//
-//            for (int i = 0; i <k+additionalPos; i++) {
-//                flushedtrajectories.add(Binary.fromString(firstTrajectories.get(i)._1()));
-//                identifiedTrajectories.remove(firstTrajectories.get(i)._1());
-//            }
-//
-//        }else{
-//            for (int i = 0; i < Math.min(k,firstTrajectories.size()); i++) {
-//                flushedtrajectories.add(Binary.fromString(firstTrajectories.get(i)._1()));
-//                identifiedTrajectories.remove(firstTrajectories.get(i)._1());
-//            }
-//        }
     }
 
-    private static void flushLowerBoundK(JavaPairRDD<Void, TrajectorySegmentWithMetadata> pairRDD, HashMap<String, List<TrajectorySegmentWithMetadata>> identifiedTrajectories, HashSet<Binary> flushedtrajectories,  SpatialPoint[] query, int k){
-
-        List<Tuple2<Double, List<TrajectorySegmentWithMetadata>>> fullTrajectories = new ArrayList<>();
-        List<Tuple2<Double,List<TrajectorySegmentWithMetadata>>> trjs = pairRDD.mapToPair(f-> Tuple2.apply(f._2.getTrajectorySegment().getObjectId(),f._2)).groupByKey().mapToPair(f->{
-            List<TrajectorySegmentWithMetadata> segments = new ArrayList<>((int)f._2.spliterator().getExactSizeIfKnown());
-            f._2.forEach(segments::add);
-            segments.sort(Comparator.comparingLong(a -> Math.abs(a.getInterval()[0])));
-
-            return Tuple2.apply(isFull(segments), segments);
-        }).mapToPair(f->{
-            if(f._1){
-                return Tuple2.apply(getLBDistance(f._2, query), f._2);
-            }
-                return Tuple2.apply(-1d, f._2);
-        }).collect();
-
-
-        trjs.forEach(i->{
-            if(i._1<0){
-                identifiedTrajectories.put(i._2.get(0).getTrajectorySegment().getObjectId(), i._2);
-            }else{
-                fullTrajectories.add(Tuple2.apply(i._1, i._2));
-            }
-        });
-
-        fullTrajectories.sort(Comparator.comparingDouble(a -> a._1));
-
-        for (int i = 0; i < Math.min(k, fullTrajectories.size()); i++) {
-            flushedtrajectories.add(Binary.fromString(fullTrajectories.get(i)._2.get(0).getTrajectorySegment().getObjectId()));
-        }
-
-        for (int i = k; i < fullTrajectories.size(); i++) {
-            identifiedTrajectories.put(fullTrajectories.get(i)._2.get(0).getTrajectorySegment().getObjectId(),fullTrajectories.get(i)._2);
-        }
-
-//        trjs.filter(f-> f._1).mapToPair(f-> Tuple2.apply(f._2.get(0).getTrajectorySegment().getObjectId(), getLBDistance(f._2, query))).takeOrdered(k, new Comparator<Tuple2<String, Double>>() {
-//            @Override
-//            public int compare(Tuple2<String, Double> o1, Tuple2<String, Double> o2) {
-//                return 0;
-//            }
-//        });
-//        trjs.filter(f-> !f._1).map(f-> f._2).collect();
-//
-//        trjs.unpersist();
-    }
-
-    private static boolean isFull(List<TrajectorySegmentWithMetadata> trajectorySegments){
-        if(trajectorySegments.size()==1 && trajectorySegments.get(0).getInterval()[0]==1 && trajectorySegments.get(0).getInterval()[1]<0){
+    private static boolean isFull(List<Tuple2<Long,TrajectorySegmentWithMetadata>> trajectorySegments){
+        if(trajectorySegments.size()==1 && trajectorySegments.get(0)._2.getInterval()[0]==1 && trajectorySegments.get(0)._2.getInterval()[1]<0){
             return true;
-        }else if(trajectorySegments.get(0).getInterval()[0]==1 && trajectorySegments.get(trajectorySegments.size()-1).getInterval()[1]<1){
-            long y = trajectorySegments.get(0).getInterval()[1];
+        }else if(trajectorySegments.get(0)._2.getInterval()[0]==1 && trajectorySegments.get(trajectorySegments.size()-1)._2.getInterval()[1]<1){
+            long y = trajectorySegments.get(0)._2.getInterval()[1];
             for (int i = 1; i < trajectorySegments.size()-1; i++) {
-                if(y+1 != trajectorySegments.get(i).getInterval()[0]) {return false;}
-                y = trajectorySegments.get(i).getInterval()[1];
+                if(y+1 != trajectorySegments.get(i)._2.getInterval()[0]) {return false;}
+                y = trajectorySegments.get(i)._2.getInterval()[1];
             }
-            if(y+1!=trajectorySegments.get(trajectorySegments.size()-1).getInterval()[0]){return false;}
+            if(y+1!=trajectorySegments.get(trajectorySegments.size()-1)._2.getInterval()[0]){return false;}
             return true;
         }
         return false;
     }
 
-    private static boolean canBePruned(List<TrajectorySegmentWithMetadata> trajectorySegments, SpatialPoint[] trajectoryQuery, double l){
-        TrajectorySegmentWithMetadata startSegment = trajectorySegments.get(0);
-        TrajectorySegmentWithMetadata endSegment = trajectorySegments.get(trajectorySegments.size()-1);
+    private static boolean canBePruned(List<Tuple2<Long,TrajectorySegmentWithMetadata>> trajectorySegments, SpatialPoint[] trajectoryQuery, double l){
+        TrajectorySegmentWithMetadata startSegment = trajectorySegments.get(0)._2;
+        TrajectorySegmentWithMetadata endSegment = trajectorySegments.get(trajectorySegments.size()-1)._2;
 
             //first point of the trajectory
             if(startSegment.getPivots().length==1){
@@ -570,9 +572,9 @@ public class Knn2DQueriesDirectoriesOptimizedNewNew {
                 return true;
             }
 
-        for (TrajectorySegmentWithMetadata trajectorySegment : trajectorySegments) {
-            if(trajectorySegment.getInterval()[0]>1 && trajectorySegment.getInterval()[1]>1){
-                for (SpatialPoint pivot : trajectorySegment.getPivots()) {
+        for (Tuple2<Long,TrajectorySegmentWithMetadata> trajectorySegment : trajectorySegments) {
+            if(trajectorySegment._2.getInterval()[0]>1 && trajectorySegment._2.getInterval()[1]>1){
+                for (SpatialPoint pivot : trajectorySegment._2.getPivots()) {
                     if(HilbertUtil.isPointMinDistGreaterThan(pivot.getLongitude(), pivot.getLatitude(), trajectoryQuery, l)){
 //                                        if (HilbertUtil.minDistPointToRectangle(pivot.getLongitude(), pivot.getLatitude(), queryMinLongitude, queryMinLatitude, queryMaxLongitude, queryMaxLatitude)> l) {
                         return true;
@@ -583,9 +585,9 @@ public class Knn2DQueriesDirectoriesOptimizedNewNew {
         return false;
     }
 
-    private static double getLBDistance(List<TrajectorySegmentWithMetadata> trajectorySegments, SpatialPoint[] trajectoryQuery){
-        TrajectorySegmentWithMetadata startSegment = trajectorySegments.get(0);
-        TrajectorySegmentWithMetadata endSegment = trajectorySegments.get(trajectorySegments.size()-1);
+    private static double getLBDistance(List<Tuple2<Long, TrajectorySegmentWithMetadata>> trajectorySegments, SpatialPoint[] trajectoryQuery){
+        TrajectorySegmentWithMetadata startSegment = trajectorySegments.get(0)._2;
+        TrajectorySegmentWithMetadata endSegment = trajectorySegments.get(trajectorySegments.size()-1)._2;
 
         double lowerBound = -Double.MAX_VALUE;
 
@@ -601,9 +603,9 @@ public class Knn2DQueriesDirectoriesOptimizedNewNew {
         //last point of the trajectory
         lowerBound = Math.max(lowerBound,HilbertUtil.euclideanDistance(endSegment.getPivots()[endSegment.getPivots().length-1].getLongitude(),endSegment.getPivots()[endSegment.getPivots().length-1].getLatitude(),trajectoryQuery[trajectoryQuery.length-1].getLongitude(),trajectoryQuery[trajectoryQuery.length-1].getLatitude()));
 
-        for (TrajectorySegmentWithMetadata trajectorySegment : trajectorySegments) {
-            if(trajectorySegment.getInterval()[0]>1 && trajectorySegment.getInterval()[1]>1){
-                for (SpatialPoint pivot : trajectorySegment.getPivots()) {
+        for (Tuple2<Long,TrajectorySegmentWithMetadata> trajectorySegment : trajectorySegments) {
+            if(trajectorySegment._2.getInterval()[0]>1 && trajectorySegment._2.getInterval()[1]>1){
+                for (SpatialPoint pivot : trajectorySegment._2.getPivots()) {
                     lowerBound = Math.max(lowerBound,HilbertUtil.pointMinDist(pivot.getLongitude(), pivot.getLatitude(), trajectoryQuery));
                 }
             }

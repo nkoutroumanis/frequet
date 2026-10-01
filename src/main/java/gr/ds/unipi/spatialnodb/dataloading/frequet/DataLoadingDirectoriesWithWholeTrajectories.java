@@ -156,7 +156,7 @@ public class DataLoadingDirectoriesWithWholeTrajectories {
             return new TrajectorySegment(objectId, out, minLongitude, minLatitude, maxLongitude, maxLatitude);
         }).filter(f-> f.getSpatialPoints().length != 1).cache();
 
-        trajectoriesRDD.mapToPair(f-> Tuple2.apply(f.getObjectId(), f)).sortByKey().mapToPair(f->Tuple2.apply(null, f._2)).saveAsNewAPIHadoopFile(writePath+File.separator+"idIndex", Void.class, TrajectorySegment.class, ParquetOutputFormat.class, job.getConfiguration());
+//        trajectoriesRDD.mapToPair(f-> Tuple2.apply(f.getObjectId(), f)).sortByKey().mapToPair(f->Tuple2.apply(null, f._2)).saveAsNewAPIHadoopFile(writePath+File.separator+"idIndex", Void.class, TrajectorySegment.class, ParquetOutputFormat.class, job.getConfiguration());
 
         Bounds bounds = trajectoriesRDD.aggregate(
                         new Bounds(),

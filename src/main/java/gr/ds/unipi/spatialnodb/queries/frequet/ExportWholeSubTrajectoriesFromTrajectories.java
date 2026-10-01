@@ -22,7 +22,7 @@ import static gr.ds.unipi.spatialnodb.AppConfig.loadConfig;
 
 public class ExportWholeSubTrajectoriesFromTrajectories {
     public static void main(String[] args) {
-        Config config = loadConfig("export-trajectories-worldtrace.conf");
+        Config config = loadConfig("export-trajectories-ddtg.conf");
 
         Config dataLoading = config.getConfig("export-trajectories");
         final String rawDataPath = dataLoading.getString("rawDataPath");

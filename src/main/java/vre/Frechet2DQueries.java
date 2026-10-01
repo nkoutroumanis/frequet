@@ -88,7 +88,7 @@ public class Frechet2DQueries {
         String fullPathExportedFile = metricsPath+ File.separator+"frechet-"+epsilon+"-"+""+Paths.get(parquetPath).getFileName().toString()+"-"+ Paths.get(queriesFilePath).getFileName().toString().replaceFirst("\\.[^.]+$", "")+".txt";
         BufferedWriter bw = new BufferedWriter(new FileWriter(fullPathExportedFile));
         BufferedReader br = new BufferedReader(new FileReader(queriesFilePath));
-        bw.write("Time Exec\tQuery Points\tNum of Trajectories\tNum of Points\tIssued\tData Pages\tIntersected Spaces\tParse\n");
+        bw.write("Time Exec\tQuery Points\tNum of Trajectories\tNum of Points\tIssued\tData Pages\tIntersected Spaces\tParse\tExamined Trajectories\n");
         String query;
         while ((query = br.readLine()) != null) {
             long startTime = System.currentTimeMillis();
@@ -203,7 +203,7 @@ public class Frechet2DQueries {
 
             if(ids.isEmpty()){
                 long endTime = System.currentTimeMillis();
-                bw.write((endTime-startTime)+"\t"+trajectoryQuery.length+"\t"+0+"\t"+0+"\t"+"false"+"\t"+DataPage.counter+"\t"+0+"\t"+parseAndCubeIndex);
+                bw.write((endTime-startTime)+"\t"+trajectoryQuery.length+"\t"+0+"\t"+0+"\t"+"false"+"\t"+DataPage.counter+"\t"+0+"\t"+parseAndCubeIndex+"\t"+0);
                 DataPage.counter = 0;
                 bw.newLine();
                 continue;
@@ -255,7 +255,7 @@ public class Frechet2DQueries {
                 numOfPoints = numOfPoints + voidTrajectoryTuple2.getSpatialPoints().length;
             }
 
-            bw.write((endTime - startTime)+"\t"+trajectoryQuery.length+"\t"+num+"\t"+numOfPoints+"\t"+"true"+"\t"+DataPage.counter+"\t"+w+"\t"+parseAndCubeIndex);
+            bw.write((endTime - startTime)+"\t"+trajectoryQuery.length+"\t"+num+"\t"+numOfPoints+"\t"+"true"+"\t"+DataPage.counter+"\t"+w+"\t"+parseAndCubeIndex+"\t"+objectIds.size());
             DataPage.counter = 0;
             bw.newLine();
         }

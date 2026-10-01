@@ -189,8 +189,12 @@ public class Frechet2DQueries {
                 }
             }
 
-            if(singleValues.size()!=1){
-                fp = or(fp, in(longColumn("key"), singleValues));
+            if(!singleValues.isEmpty()){
+                if(fp==null){
+                    fp = in(longColumn("key"), singleValues);
+                }else{
+                    fp = or(fp, in(longColumn("key"), singleValues));
+                }
             }
 
             ParquetInputFormat.setFilterPredicate(job.getConfiguration(), fp);
