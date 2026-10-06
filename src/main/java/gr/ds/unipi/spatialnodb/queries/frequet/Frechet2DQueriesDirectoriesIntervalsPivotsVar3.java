@@ -74,6 +74,7 @@ public class Frechet2DQueriesDirectoriesIntervalsPivotsVar3 {
         final IndexUtils indexUtils = new IndexUtils(minLon, minLat, maxLon, maxLat, maxOrdinates);
 
         Job job = Job.getInstance();
+        job.getConfiguration().setBoolean("dfs.client.cache.drop.behind.reads", true);
 
         ParquetInputFormat.setReadSupportClass(job, TrajectorySegmentWithMetadataReadSupport.class);
 
@@ -312,7 +313,6 @@ public class Frechet2DQueriesDirectoriesIntervalsPivotsVar3 {
             sb.deleteCharAt(sb.length()-1);
             JavaPairRDD<Long, TrajectorySegmentWithMetadata> pairRDDRangeQuery = (JavaPairRDD<Long, TrajectorySegmentWithMetadata>) jsc.newAPIHadoopFile(sb.toString(), ParquetInputFormatWithKey.class, Long.class, TrajectorySegmentWithMetadata.class, job.getConfiguration());
 
-
             pairRDDRangeQuery = pairRDDRangeQuery.filter(f -> {
                 SpatialPoint[] spatialPoints = f._2().getTrajectorySegment().getSpatialPoints();
 
@@ -337,12 +337,6 @@ public class Frechet2DQueriesDirectoriesIntervalsPivotsVar3 {
 
                 return true;
             });
-
-//                        System.out.println(pairRDDRangeQuery.collect().size());
-//            System.exit(5);
-//            if(pairRDDRangeQuery.collect().isEmpty()){
-//                System.exit(5);
-//            }
 
 
             JavaPairRDD<Void, TrajectorySegment> results = pairRDDRangeQuery.groupBy(f->f._2().getTrajectorySegment().getObjectId(), Integer.parseInt(args[0]))

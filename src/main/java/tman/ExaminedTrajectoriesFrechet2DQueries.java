@@ -8,6 +8,7 @@ import gr.ds.unipi.spatialnodb.messages.common.SpatialPoint;
 import gr.ds.unipi.spatialnodb.messages.common.tman.TManRecord;
 import gr.ds.unipi.spatialnodb.messages.common.tman.TManRecordReadSupport;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.mapreduce.Job;
@@ -18,7 +19,6 @@ import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.apache.spark.sql.SparkSession;
-import org.apache.hadoop.fs.FSDataInputStream;
 import scala.Tuple2;
 import tman.impl.*;
 
@@ -31,7 +31,7 @@ import static org.apache.parquet.filter2.predicate.FilterApi.*;
 import static tman.DpUtils.boxToBoxSetDistance;
 import static tman.DpUtils.distanceToNearestBox;
 
-public class Frechet2DQueries {
+public class ExaminedTrajectoriesFrechet2DQueries {
     public static void main(String args[]) throws IOException {
 
         Config config = loadConfig("queries-tman.conf");
@@ -66,7 +66,6 @@ public class Frechet2DQueries {
         final int beta = metadata.getInt("beta");
 
         Job job = Job.getInstance();
-        job.getConfiguration().setBoolean("dfs.client.cache.drop.behind.reads", true);
 
         ParquetInputFormat.setReadSupportClass(job, TManRecordReadSupport.class);
 
@@ -104,10 +103,10 @@ public class Frechet2DQueries {
         InMemorySignatureCache cache = InMemorySignatureCache.fromMap(codeShapes, cfg);
 
 
-        String fullPathExportedFile = metricsPath+ File.separator+"frechet-"+epsilon+"-"+""+Paths.get(parquetPath).getFileName().toString()+"-"+ Paths.get(queriesFilePath).getFileName().toString().replaceFirst("\\.[^.]+$", "")+".txt";
+        String fullPathExportedFile = metricsPath+ File.separator+"frechet-"+epsilon+"-examined-"+""+Paths.get(parquetPath).getFileName().toString()+"-"+ Paths.get(queriesFilePath).getFileName().toString().replaceFirst("\\.[^.]+$", "")+".txt";
         BufferedWriter bw = new BufferedWriter(new FileWriter(fullPathExportedFile));
         BufferedReader br = new BufferedReader(new FileReader(queriesFilePath));
-        bw.write("Time Exec\tQuery Points\tNum of Trajectories\tNum of Points\tIssued\tData Pages\tIntersected Spaces\tParse\tNumber of cell ranges\tSingle value cells\n");
+        bw.write("Time Exec\tQuery Points\tNum of Trajectories\tNum of Points\tIssued\tData Pages\tIntersected Spaces\tParse\tLoaded Trajectories\tChecked Trajectories\n");
         String query;
         while ((query = br.readLine()) != null) {
             long startTime = System.currentTimeMillis();
@@ -208,13 +207,15 @@ public class Frechet2DQueries {
 
             if(ranges.isEmpty()){
                 long endTime = System.currentTimeMillis();
-                bw.write((endTime-startTime)+"\t"+trajectoryQuery.length+"\t"+0+"\t"+0+"\t"+"false"+"\t"+DataPage.counter+"\t"+0+"\t"+parseAndCubeIndex+"\t"+((ranges.isEmpty())?0:ranges.size())+"\t"+((singleValues.isEmpty())?0:singleValues.size()));
+                bw.write((endTime-startTime)+"\t"+trajectoryQuery.length+"\t"+0+"\t"+0+"\t"+"false"+"\t"+DataPage.counter+"\t"+0+"\t"+parseAndCubeIndex+"\t"+0+"\t"+0);
                 DataPage.counter = 0;
                 bw.newLine();
                 continue;
             }
 
             JavaPairRDD<Void, TManRecord> pairRDDRangeQuery = (JavaPairRDD<Void, TManRecord>) jsc.newAPIHadoopFile(parquetPath+ File.separator+"sIndex", ParquetInputFormat.class, Void.class, TManRecord.class, job.getConfiguration());
+            long loadedTrajectories = pairRDDRangeQuery.count();
+
             pairRDDRangeQuery = pairRDDRangeQuery.filter(f->{
                 SpatialPoint[] spatialPoints = f._2().getSpatialPoints();
 
@@ -253,8 +254,10 @@ public class Frechet2DQueries {
                     }
                 }
                 return true;
-            }).filter(f-> HilbertUtil.frechetDistanceIsLessThanEpsilon(trajectoryQuery, f._2.getSpatialPoints(),epsilon));
-//            System.out.println(pairRDDRangeQuery.count());
+            });
+            long checkedTrajectories = pairRDDRangeQuery.count();
+
+            pairRDDRangeQuery = pairRDDRangeQuery.filter(f-> HilbertUtil.frechetDistanceIsLessThanEpsilon(trajectoryQuery, f._2.getSpatialPoints(),epsilon));
 
             List<Tuple2<Void,TManRecord>> trajs = pairRDDRangeQuery.collect();
             long endTime = System.currentTimeMillis();
@@ -265,7 +268,7 @@ public class Frechet2DQueries {
                 numOfPoints = numOfPoints + voidTrajectoryTuple2._2.getSpatialPoints().length;
             }
 
-            bw.write((endTime - startTime)+"\t"+trajectoryQuery.length+"\t"+num+"\t"+numOfPoints+"\t"+"true"+"\t"+DataPage.counter+"\t"+w+"\t"+parseAndCubeIndex+"\t"+((ranges.isEmpty())?0:ranges.size())+"\t"+((singleValues.isEmpty())?0:singleValues.size()));
+            bw.write((endTime - startTime)+"\t"+trajectoryQuery.length+"\t"+num+"\t"+numOfPoints+"\t"+"true"+"\t"+DataPage.counter+"\t"+w+"\t"+parseAndCubeIndex+"\t"+loadedTrajectories+"\t"+checkedTrajectories);
             DataPage.counter = 0;
             bw.newLine();
         }

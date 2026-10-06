@@ -72,6 +72,7 @@ public class Frechet2DQueriesDirectoriesIntervalsPivotsVar2 {
         final IndexUtils indexUtils = new IndexUtils(minLon, minLat, maxLon, maxLat, maxOrdinates);
 
         Job job = Job.getInstance();
+        job.getConfiguration().setBoolean("dfs.client.cache.drop.behind.reads", true);
 
         ParquetInputFormat.setReadSupportClass(job, TrajectorySegmentWithMetadataReadSupport.class);
 

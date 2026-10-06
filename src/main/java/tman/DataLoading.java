@@ -39,7 +39,7 @@ import static gr.ds.unipi.spatialnodb.AppConfig.loadConfig;
 public class DataLoading {
     public static void main(String[] args) throws IOException {
 
-        Config config = loadConfig("data-loading-tman.conf");
+        Config config = loadConfig("data-loading-tman-geolife.conf");
 
         Config dataLoading = config.getConfig("data-loading");
         final String rawDataPath = dataLoading.getString("rawDataPath");
@@ -57,7 +57,7 @@ public class DataLoading {
         final int beta = dataLoading.getInt("beta");
 
         Job job = Job.getInstance();
-        job.getConfiguration().setInt("parquet.block.size", 1024*1024*1024);
+        job.getConfiguration().setInt("parquet.block.size", 128 * 1024 * 1024);
 
         ParquetOutputFormat.setCompression(job, CompressionCodecName.SNAPPY);
         ParquetOutputFormat.setWriteSupportClass(job, TManRecordWithKeyWriteSupport.class);

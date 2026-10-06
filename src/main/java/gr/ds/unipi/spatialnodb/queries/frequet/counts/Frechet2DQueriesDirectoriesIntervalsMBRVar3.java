@@ -108,7 +108,7 @@ public class Frechet2DQueriesDirectoriesIntervalsMBRVar3 {
         String fullPathExportedFile = metricsPath+ File.separator+"prunings-frechet-"+epsilon+"-"+"mbr-var3-"+Paths.get(parquetPath).getFileName().toString()+"-"+ Paths.get(queriesFilePath).getFileName().toString().replaceFirst("\\.[^.]+$", "")+".txt";
         BufferedWriter bw = new BufferedWriter(new FileWriter(fullPathExportedFile));
         BufferedReader br = new BufferedReader(new FileReader(queriesFilePath));
-        bw.write("Query Points\tIntersected Cubes\tAll Prunings Pruned\ttrajectoriesInCells\tpreLoadTrajectories\tpreLoadTrajectories Pruned\tendPointsTrajectories\tendPointsTrajectories Pruned\tlocalPruningTrajectories\tlocalPruningTrajectories Pruned\tgapPruningTrajectories\tgapPruningTrajectories Pruned\tfrechetTrajectories\tfrechetTrajectories Pruned\n");
+        bw.write("Query Points\tIntersected Cubes\tAll Prunings Pruned\ttrackletsInCells\ttrajectoriesInCells\tpreLoadTrajectories\tpreLoadTrajectories Pruned\tendPointsTrajectories\tendPointsTrajectories Pruned\tlocalPruningTrajectories\tlocalPruningTrajectories Pruned\tgapPruningTrajectories\tgapPruningTrajectories Pruned\tfrechetTrajectories\tfrechetTrajectories Pruned\n");
         String query;
         while ((query = br.readLine()) != null) {
             long startTime = System.currentTimeMillis();
@@ -310,6 +310,7 @@ public class Frechet2DQueriesDirectoriesIntervalsMBRVar3 {
             sb.deleteCharAt(sb.length()-1);
             job.getConfiguration().unset("parquet.private.read.filter.predicate");
             JavaPairRDD<Long, TrajectorySegmentWithIntervalMetadata> pairRDDRangeQuery = (JavaPairRDD<Long, TrajectorySegmentWithIntervalMetadata>) jsc.newAPIHadoopFile(sb.toString(), ParquetInputFormatWithKey.class, Long.class, TrajectorySegmentWithIntervalMetadata.class, job.getConfiguration());
+            long trackletsInCells = pairRDDRangeQuery.count();
             long trajectoriesInCells = completeTrajectories(pairRDDRangeQuery).count();
 
             ParquetInputFormat.setFilterPredicate(job.getConfiguration(), fp);

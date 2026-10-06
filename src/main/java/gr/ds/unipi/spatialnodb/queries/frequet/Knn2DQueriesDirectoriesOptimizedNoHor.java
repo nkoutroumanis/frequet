@@ -77,6 +77,10 @@ public class Knn2DQueriesDirectoriesOptimizedNoHor {
 
         Job jobWholeTrajectory = Job.getInstance();
         Job jobTrajectorySegments = Job.getInstance();
+        jobWholeTrajectory.getConfiguration().setBoolean("dfs.client.cache.drop.behind.reads", true);
+        jobTrajectorySegments.getConfiguration().setBoolean("dfs.client.cache.drop.behind.reads", true);
+
+
         int queriedTrajectoriesCounter = 0;
 
 //        ParquetInputFormat.setReadSupportClass(jobWholeTrajectory, TrajectorySegmentReadSupport.class);

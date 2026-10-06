@@ -73,6 +73,8 @@ public class KnnQueries {
 
         Job jobMeta = Job.getInstance();
         Job jobSegmentPoints = Job.getInstance();
+        jobMeta.getConfiguration().setBoolean("dfs.client.cache.drop.behind.reads", true);
+        jobSegmentPoints.getConfiguration().setBoolean("dfs.client.cache.drop.behind.reads", true);
 
         ParquetInputFormat.setReadSupportClass(jobMeta, VRERecordMetadataReadSupport.class);
         ParquetInputFormat.setReadSupportClass(jobSegmentPoints, VRERecordSegmentPointsReadSupport.class);

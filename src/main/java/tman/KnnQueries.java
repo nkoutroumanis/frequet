@@ -68,6 +68,7 @@ public class KnnQueries {
         final int beta = metadata.getInt("beta");
 
         Job job = Job.getInstance();
+        job.getConfiguration().setBoolean("dfs.client.cache.drop.behind.reads", true);
 
         ParquetInputFormat.setReadSupportClass(job, TManRecordReadSupport.class);
 

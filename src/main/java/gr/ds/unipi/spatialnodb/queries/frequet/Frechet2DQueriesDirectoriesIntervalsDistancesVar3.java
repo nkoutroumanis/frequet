@@ -74,6 +74,7 @@ public class Frechet2DQueriesDirectoriesIntervalsDistancesVar3 {
         final IndexUtils indexUtils = new IndexUtils(minLon, minLat, maxLon, maxLat, maxOrdinates);
 
         Job job = Job.getInstance();
+        job.getConfiguration().setBoolean("dfs.client.cache.drop.behind.reads", true);
 //        ParquetInputFormat.setTaskSideMetaData(job, true);
 //        System.out.println(job.getConfiguration().get("parquet.task.side.metadata"));
 
@@ -423,9 +424,10 @@ public class Frechet2DQueriesDirectoriesIntervalsDistancesVar3 {
             }
 
             sb.deleteCharAt(sb.length()-1);
+//            job.getConfiguration().setLong("mapreduce.input.fileinputformat.split.minsize", Long.MAX_VALUE);
 //            job.getConfiguration().set("mapreduce.input.fileinputformat.split.maxsize", "134217728");
             JavaPairRDD<Long, TrajectorySegmentWithIntervalMetadata> pairRDDRangeQuery = (JavaPairRDD<Long, TrajectorySegmentWithIntervalMetadata>) jsc.newAPIHadoopFile(sb.toString()/*parquetPath+ File.separator+"stIndex"+File.separator*/, ParquetInputFormatWithKey.class, Long.class, TrajectorySegmentWithIntervalMetadata.class, job.getConfiguration());
-
+//            System.out.println("Input partitions: " + pairRDDRangeQuery.getNumPartitions());
 
             pairRDDRangeQuery = pairRDDRangeQuery.filter(f -> {
                 SpatialPoint[] spatialPoints = f._2().getTrajectorySegment().getSpatialPoints();

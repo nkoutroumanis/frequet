@@ -62,7 +62,7 @@ public class DataLoadingDirectoriesWithWholeTrajectories {
         final long maxOrdinates = hilbertCurve.maxOrdinate();
 
         Job job = Job.getInstance();
-        job.getConfiguration().setInt("parquet.block.size", 1024*1024*1024);
+        job.getConfiguration().setInt("parquet.block.size", 128 * 1024 * 1024);
 
         ParquetOutputFormat.setCompression(job, CompressionCodecName.SNAPPY);
         ParquetOutputFormat.setWriteSupportClass(job, TrajectorySegmentWriteSupport.class);
